@@ -316,7 +316,7 @@
       .entries(nodes)
       .map(function (object) { return object.values; });
     // Attribute x coordonates depending on the information system of the variable
-    var positionsByInformationSystem = [100, 250, 400, 550, 650, 800, 1000, 1200];
+    var positionsByInformationSystem = [150, 300, 400, 550, 650, 800, 1000, 1200];
     nodesByInformationSystem.forEach( function (nodes,i){ nodes.forEach(function (n) { n.width = nodeWidth; n.x = positionsByInformationSystem[i]; }) } );
   }
 
@@ -602,9 +602,10 @@
       var arrowHeadLength = link.thickness * arrowheadScaleFactor,
           straightSectionLength = (3 * link.thickness / 4) - arrowHeadLength,
           
-          x0 = link.source.x + link.source.width,
+          x0 = link.source.x + link.source.width/2,
           x1 = x0 + arrowHeadLength / 2,
-          x4 = link.target.x - straightSectionLength - arrowHeadLength,
+          // x4 = link.target.x - straightSectionLength - arrowHeadLength,
+          x4 = link.target.x - link.target.width/2,
           xi = d3.interpolateNumber(x0, x4),
           x2 = xi(curvature),
           x3 = xi(1 - curvature),

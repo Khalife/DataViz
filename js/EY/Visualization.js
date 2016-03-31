@@ -929,7 +929,7 @@ function updatePathView(){
 
   nodeVariable.select("text")
     .attr("x", function (d) {return (5/2)*d.name.length;})
-    .attr("y", function (d) {return d.height / 2 + 10 ;})
+    .attr("y", function (d) {return NODE_HEIGHT ;})
     .attr("dy", ".35em")
     .attr("text-anchor", "end")
     .attr("transform", null)
