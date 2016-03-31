@@ -938,7 +938,6 @@ function updatePathView(){
   ///////////////////////////////////////////////////////////////////////////////////////////////////////
   // Links
   var link, linkEnter;
-
   link = svg.select("#links").selectAll("path.link")
     .data(biHiSankey.visibleLinks(), function (d) { return d.id; });
   link.transition()
@@ -1018,9 +1017,8 @@ function launchDataVizModuleForPathView() {
   var IS_COLORS = [];
   var IS_NUMBERS = []; 
   //var legendData = NodesCharacteristics[2];
-  biHiSankey.informationSystems(vizData.informationSystems);
-  for (var i = 0; i < informationSystems.length; i++){ IS_NUMBERS.push(i+1); IS_COLORS.push(IS_COLORS_STOCK[i]);}; 
-  isColorScale = d3.scale.ordinal().domain(informationSystems).range(IS_COLORS);
+  for (var i = 0; i < vizData.informationSystems.length; i++){ IS_NUMBERS.push(i+1); IS_COLORS.push(IS_COLORS_STOCK[i]);}; 
+  isColorScale = d3.scale.ordinal().domain(vizData.informationSystems).range(IS_COLORS);
   biHiSankey = d3.Sankey_PathView();
   // Set the biHiSankey diagram properties
   biHiSankey
@@ -1041,7 +1039,6 @@ function launchDataVizModuleForPathView() {
       node.state = node.parent ? "contained" : "collapsed";
     }) // initializeNodes calling 6 functions, generating temporary variables used for display 
     .layout(LAYOUT_INTERATIONS); // layout calls 6 functions, including one which computing default x and y positions.
-  // debugger;
   disableUserInterractions(2 * TRANSITION_DURATION);
   updatePathView();
 }

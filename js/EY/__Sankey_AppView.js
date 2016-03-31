@@ -25,7 +25,7 @@ d3.Sankey_AppView = function () {
     defaultLinkCurvature = 1,
     //WIDTH = 940;
     WIDTH = 1480,
-    informationSystems = {};
+    informationSystems;
 
   function center(node) {
     //
@@ -107,7 +107,7 @@ d3.Sankey_AppView = function () {
       link.id = link.source + '-' + link.target;
       link.source = sourceNode;
       link.target = targetNode;
-      console.log(link.id);
+      console.log(link.id + "/" + link.source.name + "/" + link.target.name); 
       sourceNode.sourceLinks.push(link);
       targetNode.targetLinks.push(link);
     });

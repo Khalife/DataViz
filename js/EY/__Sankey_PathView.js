@@ -14,7 +14,8 @@
     links = [],
     xScaleFactor = 1,
     yScaleFactor = 1,
-    defaultLinkCurvature = 0.5;
+    defaultLinkCurvature = 0.5,
+    informationSystems;
 
   function center(node) {
     return node.y + node.height / 2;
@@ -89,10 +90,12 @@
   function computeNodeLinks() {
     var i = 0;
     var sourceNode, targetNode;
+    // links.splice(-1,1); // remove last link which seems useless here
     links.forEach(function (link) {
-      sourceNode = nodeMap[link.source] || link.source;
-      targetNode = nodeMap[link.target] || link.target;
-      link.id = link.source + '-' + link.target;
+      sourceNode = nodeMap[link.source] || link.source || "";
+      targetNode = nodeMap[link.target] || link.target || "";
+      link.id = (sourceNode.id || "") + '-' + (targetNode.id || "");
+      // console.log(link.source.name + "/" + link.target.name); 
       link.source = sourceNode;
       link.target = targetNode;
       if (sourceNode.sourceLinks) {sourceNode.sourceLinks.push(link)};
@@ -313,7 +316,7 @@
       .entries(nodes)
       .map(function (object) { return object.values; });
     // Attribute x coordonates depending on the information system of the variable
-    var positionsByInformationSystem = [1100, 750, 600, 300, 100];
+    var positionsByInformationSystem = [100, 250, 400, 550, 650, 800, 1000, 1200];
     nodesByInformationSystem.forEach( function (nodes,i){ nodes.forEach(function (n) { n.width = nodeWidth; n.x = positionsByInformationSystem[i]; }) } );
   }
 
@@ -385,6 +388,11 @@
       });
     }
 
+
+    // function computeNodeYPositionsTest (){
+
+    // }
+
     function initializeNodeYPosition() {
       // nodesByXPosition.forEach(function (nodes) {
       //   nodes.forEach(function (node, i) {
@@ -404,7 +412,7 @@
       // }
 
       // nodesByInformationSystem.forEach( function (nodes,i){ nodes.forEach(function (n) { n.y = 100 + 600*Math.random(); }) } );
-      nodes.forEach( function (node) { node.y = 100 + 600*Math.random();});
+      nodes.forEach( function (node) { node.y = 100 + 500*Math.random();});
     }
 
     function calculateLinkThickness() {
@@ -486,10 +494,10 @@
       });
     }
 
-    calculateYScaleFactor();
+    // calculateYScaleFactor();
     initializeNodeYPosition();
     calculateLinkThickness();
-    resolveCollisions();
+    // resolveCollisions();
 
     for (alpha = 1; iterations > 0; --iterations) {
       alpha *= 0.99;
@@ -704,6 +712,12 @@
     nodes.forEach(callback);
     return biHiSankey;
   };
+
+  biHiSankey.informationSystems = function (_) {
+    if ( !arguments.length ){ return informationSystems;}
+    informationSystems = _;
+    return biHiSankey;
+  }
 
   return biHiSankey;
 };

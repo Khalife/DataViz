@@ -70,8 +70,8 @@ function buildVizData(worksheet, numberOfLineBeginning, numberOfLineEnding){
   for (var i = numberOfLineBeginning; i != numberOfLineEnding; i++){
       if (worksheet["C" + i.toString()]){
         // var tabFields = ["originid", "present","next", "nextIS","previous","informationsystem", "controlquality", "informationtype", "etape"];
-        var tabFields = ["presentId", "present", "nextId", "next", "nextIS","previous","informationsystem", "controlquality", "informationtype", "etape"];
-        var tabFieldsColumnLocation = ["D", "C", "AC", "AB", "AD","AF", "Q", "AJ", "F", "P"];
+        var tabFields = ["output", "outputId", "presentId", "present", "nextId", "next", "nextIS","previous","informationsystem", "controlquality", "informationtype", "etape"];
+        var tabFieldsColumnLocation = ["A", "B", "D", "C", "AC", "AB", "AD","AF", "Q", "AJ", "F", "P"];
 
         var result = {
           "type": 'Global',
@@ -141,29 +141,10 @@ function createPathNodesAndLinksFromData(data){
   var Links = [];
 
   for (var i = 0; i != data.length;i++){
-    // target = data[i]["next"];
-    // var endOfLineSymbol = target.match(/\n/g)||["|"];
-    // var stringAsArray = target.split(endOfLineSymbol);
-    // for (var s of stringAsArray) {
-    //   id = getIdFromName(data, s);
-    //   // will work only if one dependant only in each cell
-    //   //  debugger;
-    //   if (id >= 0){
-    //     var newLink = {
-    //       'source': data[i]["id"],
-    //       //'source': i,
-    //       'target': id,
-    //       'value' : 1
-    //     };
-    //     Links.push(newLink);
-    //     console.log(newLink);
-    //   }
-    // }
 
     var newLink = {
       'source': data[i]["presentId"],
-      //'source': i,
-      'target': data[i]["nextId"],
+      'target': data[i]["nextId"] || data[i]["outputId"],
       'value' : 1
     };
     Links.push(newLink);
@@ -175,9 +156,10 @@ function createPathNodesAndLinksFromData(data){
       "type": 'Global',
       "presentId": data[i]["presentId"],
       "name": data[i]["present"],
-      "nextId": data[i]["nextId"],
-      "next": data[i]["next"],
-      "nextIS": replaceISname(data[i]["nextIS"]),
+      "isOutputNode": false,
+      "nextId": data[i]["nextId"] || data[i]["outputId"],
+      "next": data[i]["next"] || data[i]["output"],
+      "nextIS": replaceISname(data[i]["nextIS"]) || "output",
       "code": "",
       "informationsystem": replaceISname(data[i]["informationsystem"]),
       "informationtype" : data[i]["informationtype"],
@@ -187,6 +169,22 @@ function createPathNodesAndLinksFromData(data){
     Nodes.push(newNode);
   }
 
+  var outputNode = {
+    "type": 'Global',
+    "presentId": data[0]["outputId"],
+    "name": data[0]["output"],
+    "isOutputNode": true,
+    "nextId": "",
+    "next": "",
+    "nextIS": "",
+    "code": "",
+    "informationsystem": "output",
+    "informationtype" : "",
+    "controlquality" : "",
+    "etape" : ""
+  }
+
+  Nodes.push(outputNode);
 
   var result = [Nodes, Links];
   NodesAndLinks = result;

@@ -130,7 +130,7 @@ function getNodeFromId(Nodes, index){
       return Nodes[i];
     }
   }
-  return {"id" : 1};
+  return null;
 }
 
 
@@ -148,7 +148,7 @@ function applicativeViewTransform(Nodes, Links, vizData){
   // 1 : create liste (source, target) without double
   var informationSystemsDoublon = [];
   for (var i = 0; i!= Nodes.length; i++){
-    if ( Nodes[i]["informationsystem"] != Nodes[i]["nextIS"] ){ // under the condition of different source and target
+    if (Nodes[i]["informationsystem"] != Nodes[i]["nextIS"] ){ // under the condition of different source and target
       informationSystemsDoublon.push([Nodes[i]["informationsystem"], Nodes[i]["nextIS"]]);
     }
   }
@@ -303,6 +303,19 @@ function applicativeViewTransform(Nodes, Links, vizData){
   return [NodesAndLinks[0], NodesAndLinks[1], legendData];
 }
 
+// function getAllLinksWithNames(nameNode, NewNodes, Links){
+//   // Get links after parsing between Nodes containing names of variables and ID, and Links built with IDs
+//   for (var i = 0; i < NewNodes.length; i ++){
+//     if ( NewNodes[i].name == nameNode ){
+//       id = NewNodes[i].id;
+//     }
+//   }
+//   for (var i = 0; i < Links.length; i ++){
+//     if ( Links[i].target. == nameNode ){ }
+//   }
+
+// }
+
 function pathViewTransform(Nodes, Links, vizData){
   ////////////////////////////////////////////////////////////////////////////////////////
   //////////////////// Creating nodes containing variables   ///////////////////////////////
@@ -313,7 +326,7 @@ function pathViewTransform(Nodes, Links, vizData){
     NewNodes.push({
       "type": "variable",
       "iscalculated" : iscalculated,
-      "id": i,
+      "id": Nodes[i].presentId,
       "name" : Nodes[i].name,
       "x" : 0,
       "y" : 0,
@@ -322,13 +335,17 @@ function pathViewTransform(Nodes, Links, vizData){
       // "height" : defaultHeight / 2
     });
   }
-
   for (var i = 0; i!= Links.length; i++){
     var sourceVariable = Links[i].source;
-    var NodeSource = getNodeFromId(Nodes, sourceVariable);
+    var targetVariable = Links[i].target;
+    var NodeSource = getNodeFromId(NewNodes, sourceVariable);
+    var NodeTarget = getNodeFromId(NewNodes, targetVariable);
     var typeOfLink = NodeSource["controlquality"];
     Links[i]["type"] = typeOfLink;
     Links[i]["view"] = "path";
+    Links[i]["source"] = NodeSource;
+    Links[i]["target"] = NodeTarget; 
+    // Links[i]["name"] = NodeSource["name"]
     // Links[i]["id"] = getNodeFromId(Nodes, Links[i]["id"] );
   }
 
