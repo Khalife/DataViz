@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>EY FSO DnA DataViz prototype</title>
+    <!-- Stlesheet -->
+    <link href="css/style.css" rel="stylesheet">
+  </head>
+  <body>
+    <!-- File picker -->
+    <input type="file" id="files" name="files[]"/>
+    <!-- Dataviz startup buttons -->
+    <button id= "launchOnClickAppView" type="button" onclick="launchDataVizModuleForAppView()">Applicative View</button>
+    <button id= "launchOnClickPathView" type="button" onclick="launchDataVizModuleForPathView()">Path View</button>
+    <output id="output"></output>
+    <!-- Dataviz wrapper -->
+    <div id="chart"></div>
+    <!-- 3rd party libs untouched by EY -->
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="https://code.jquery.com/jquery-1.12.1.min.js"></script>
+    <script src="https://cdn.rawgit.com/SheetJS/js-xlsx/master/dist/xlsx.core.min.js"></script>
+    <!-- 3rd party libs modified by EY -->
+    <script src="js/EY/__Sankey_AppView.js"></script>
+    <script src="js/EY/__Sankey_PathView.js"></script>
+    <!-- EY import utility - XLS handling from JS -->
+    <script src="js/EY/Import.js"></script>
+    <!-- EY tranform utility - data schema creation and completion -->
+    <script src="js/EY/Transform.js"></script>
+    <!-- EY dataviz wrapper - data visualization based on FS Risk team specs -->
+    <script src="js/EY/Visualization.js"></script>
+
+  </body>
+</html>
+
