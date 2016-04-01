@@ -1,4 +1,6 @@
-﻿d3.Sankey_PathView = function () {
+﻿// Forked from Neilos - 2015 (Github)
+// A d3 javascript library/plugin for drawing bi-directional hierarchical sankey diagrams
+d3.Sankey_PathView = function () {
   "use strict";
 
   var biHiSankey = {},
@@ -316,7 +318,7 @@
       .entries(nodes)
       .map(function (object) { return object.values; });
     // Attribute x coordonates depending on the information system of the variable
-    var positionsByInformationSystem = [150, 300, 400, 550, 650, 800, 1000, 1200];
+    var positionsByInformationSystem = [100, 300, 425, 550, 675, 875, 1100, 1400];
     nodesByInformationSystem.forEach( function (nodes,i){ nodes.forEach(function (n) { n.width = nodeWidth; n.x = positionsByInformationSystem[i]; }) } );
   }
 
@@ -412,7 +414,13 @@
       // }
 
       // nodesByInformationSystem.forEach( function (nodes,i){ nodes.forEach(function (n) { n.y = 100 + 600*Math.random(); }) } );
-      nodes.forEach( function (node) { node.y = 100 + 500*Math.random();});
+      // nodes.forEach( function (node) { node.y = 100 + 500*Math.random();});
+      nodesByXPosition.forEach(function (nodes) {
+      nodes.forEach(function (node, i) {
+      node.y = 100*i;
+      node.heightAllowance = node.value * yScaleFactor + linkSpacing * node.linkSpaceCount;
+        });
+      });
     }
 
     function calculateLinkThickness() {

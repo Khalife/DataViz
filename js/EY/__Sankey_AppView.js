@@ -1,4 +1,4 @@
-﻿// Forked from Neilos - 2015
+﻿// Forked from Neilos - 2015 (Github)
 // A d3 javascript library/plugin for drawing bi-directional hierarchical sankey diagrams
 var WIDTH = 940;
 var HEIGHT = 934;
@@ -25,7 +25,8 @@ d3.Sankey_AppView = function () {
     defaultLinkCurvature = 1,
     //WIDTH = 940;
     WIDTH = 1480,
-    informationSystems;
+    informationSystems,
+    legendData;
 
   function center(node) {
     //
@@ -457,12 +458,12 @@ d3.Sankey_AppView = function () {
     }
 
     function initializeNodeYPosition() {
-      nodes.filter(function (d){ if (d.type === "informationsystem" ) { return true;} }).forEach(function (node){ node.y = 20 + 100*Math.random();});
+      nodes.filter(function (d){ if (d.type === "informationsystem" ) { return true;} }).forEach(function (node, i){ node.y = 20 + 30*i;});
       var nbVariablesIS;
       for (var i = 0; i < informationSystems.length; i++){
         var concernedVariables = nodes.filter(function (d){ if (  d.type === "variable"   ) { return true;} }).filter(function (d){ if (  d.informationsystem === informationSystems[i] ) { return true;} });
         nbVariablesIS = concernedVariables.length;
-        concernedVariables.forEach(function (node){ node.y = 250 + nbVariablesIS*nodeWidth*Math.random();});
+        concernedVariables.forEach(function (node){ node.y = 350 + nbVariablesIS*nodeWidth*Math.random();});
       }
       // // nodes.filter(function (d){ if (d.type === "variable" ) { return true;} }).forEach(function (node){  node.y = 400 + 200*Math.random();});
       
@@ -950,6 +951,12 @@ d3.Sankey_AppView = function () {
     informationSystems = _;
     return biHiSankey;
   };
+
+  biHiSankey.legendData = function (_){
+    if (!arguments.length){ return legendData; }
+    legendData = _;
+    return biHiSankey;
+  }
 
   return biHiSankey;
 };

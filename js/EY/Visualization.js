@@ -2,8 +2,6 @@
 
 var svg, tooltip, biHiSankey, path, defs, colorScale, highlightColorScale, typeColorScale, isColorScale, strokeColorScale, isTransitioning;
 
-
-
 var OPACITY = {
     NODE_DEFAULT: 0.9,
     NODE_FADED: 0.1,
@@ -46,7 +44,8 @@ var OPACITY = {
   REFRESH_INTERVAL = 7000,
 
 
-  IS_COLORS_STOCK = ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854", "#ffd92f", "#e5c494"];
+  //IS_COLORS_STOCK = ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854", "#ffd92f", "#e5c494"];
+  IS_COLORS_STOCK = ["#1C86EE", "#6C7B8B", "#CAAECE", "#A751D2", "#571E74", "#E2006A", "#e5c494"];
 
 
 
@@ -483,23 +482,75 @@ function updateAppView () {
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////////
   
-  node.on("mouseenter", function (g) {
-    if (!isTransitioning) {
-      // highlightConnected(g);
+  // node.on("mouseenter", function (g) {
+  //   if (!isTransitioning) {
+  //     // highlightConnected(g);
+  //     restoreLinksAndNodes();
+  //     // fadeUnconnected(g);
+
+  //     // d3.select(this).select("rect")
+  //     //   .style("fill", function (d) {
+  //     //     // d.color = d.netFlow > 0 ? INFLOW_COLOR : OUTFLOW_COLOR;
+
+  //     //     return d.color;
+  //     //   })
+  //     //   .style("stroke", function (d) {
+  //     //     return d3.rgb(d.color).darker(0.1);
+  //     //   })
+  //     //   .style("fill-opacity", OPACITY.LINK_DEFAULT);
+
+  //     tooltip
+  //       .style("left", g.x + MARGIN.LEFT + "px")
+  //       .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
+  //       .transition()
+  //         .duration(TRANSITION_DURATION)
+  //         .style("opacity", 1).select(".value")
+  //         .text(function () {
+  //           var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
+  //           return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
+  //         });
+  //   }
+  // });
+
+  nodeVariableCalculated.on("mouseEnter", function (g){
+    if (!isTransitioning){
       restoreLinksAndNodes();
-      // fadeUnconnected(g);
+      tooltip
+        .style("left", g.x + MARGIN.LEFT + "px")
+        .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
+        .transition()
+          .duration(TRANSITION_DURATION)
+          .style("opacity", 1).select(".value")
+          .text(function (g) {
+            var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
+            // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
+            // return g.informationsystem + "\n" + g.name;
+            return "ok";
+          });
+    }
+  });
 
-      // d3.select(this).select("rect")
-      //   .style("fill", function (d) {
-      //     // d.color = d.netFlow > 0 ? INFLOW_COLOR : OUTFLOW_COLOR;
+  nodeVariableElementary.on("mouseEnter", function (g){
+    if (!isTransitioning){
+      restoreLinksAndNodes();
+      tooltip
+        .style("left", g.x + MARGIN.LEFT + "px")
+        .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
+        .transition()
+          .duration(TRANSITION_DURATION)
+          .style("opacity", 1).select(".value")
+          .text(function (g) {
+            var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
+            // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
+            // return g.informationsystem + "\n" + g.name;
+            return "ok";
+          });
+    }
+  });
 
-      //     return d.color;
-      //   })
-      //   .style("stroke", function (d) {
-      //     return d3.rgb(d.color).darker(0.1);
-      //   })
-      //   .style("fill-opacity", OPACITY.LINK_DEFAULT);
-
+  nodeInformationSystem.on("mouseenter", function (g){
+    if (!isTransitioning){
+      restoreLinksAndNodes();
       tooltip
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
@@ -508,54 +559,12 @@ function updateAppView () {
           .style("opacity", 1).select(".value")
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
+            // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
+            return g.equipe + "\n" + g.responsable ;
           });
     }
   });
 
-
-  // Mouse enter event used for information system and variable viz
-  node.on("mouseenter", function (g) {
-    if (!isTransitioning) {
-      // highlightConnected(g);
-      restoreLinksAndNodes();
-      // fadeUnconnected(g);
-      // if (g.iscalculated == false){
-      // d3.select(this).select("polygon")
-      //   .style("fill", function (d) {
-      //     d.color = d.netFlow > 0 ? INFLOW_COLOR : OUTFLOW_COLOR;
-      //     return d.color;
-      //   })
-      //   .style("stroke", function (d) {
-      //     return d3.rgb(d.color).darker(0.1);
-      //   })
-      //   .style("fill-opacity", OPACITY.LINK_DEFAULT);
-      // }
-
-      // else{
-      // d3.select(this).select("circle")
-      //   .style("fill", function (d) {
-      //     d.color = d.netFlow > 0 ? INFLOW_COLOR : OUTFLOW_COLOR;
-      //     return d.color;
-      //   })
-      //   .style("stroke", function (d) {
-      //     return d3.rgb(d.color).darker(0.1);
-      //   })
-      //   .style("fill-opacity", OPACITY.LINK_DEFAULT);
-      // } 
-
-      tooltip
-        .style("left", g.x + MARGIN.LEFT + "px")
-        .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
-        .transition()
-          .duration(TRANSITION_DURATION)
-          .style("opacity", 1).select(".value")
-          .text(function () {
-            var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
-          });
-    }
-  });
 
   node.on("mouseleave", function () {
     if (!isTransitioning) {
@@ -610,53 +619,140 @@ function updateAppView () {
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   // Legend - to be included in a collapser ?!
   // var legendData = [{"id" : 1, "type" : "elementaryVariable", "x" : 400, "y" : 800}];
-  // legend = svg.select("#legend").selectAll(".legend").data(legendData, function (l) { return l.id; }); // intermediate
-  // var legendEnter = legend.enter().append("g")
-  //                     .attr("class", "legend")
-  //                     .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";})
+  legend = svg.select("#legend").selectAll(".legend").data(biHiSankey.legendData(), function (l) { return l.id; }); // intermediate
+  var legendEnter = legend.enter().append("g")
+                      .attr("class", "legend")
+                      .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";})
 
-  // var legendElementaryVariables = legend.filter(function (l) { return ( l.type == "elementaryVariable" );});
-  // var legendCalculatedVariables = legend.filter(function (l){ return ( l.type == "calculatedVariable" );});
-  // var legendCollectInformationSystems = legend.filter(function (l){ return (l.type == "collectIS");});
-  // var legendAgregationInformationSystems = legend.filter(function (l){ return (l.type == "agregationIS");});
-  // var legendRestitutionInformationSystems = legend.filter(function (l){ return (l.type == "restitutionIS");});
-  // // var legendLinkAutomatic = legend.filter( function (l) { return l.type == "automaticlink"});
-  // // var legendLinkSemiAutomatic = legend.filter( function (l) { return l.type == "semiautomatic"})
-  // // 1 - Elementary variables
-  // legendElementaryVariables.append("polygon") 
-  //   .style("stroke", "black")  // colour the line
-  //   .style("stroke-WIDTH", "2px")
-  //   .style("fill", "#FFFFFF")
-  //   .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/2); } );  // x,y points 
+  var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );});
+  var legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );});
+  var legendCollectInformationSystems = legend.filter(function (l){ return (l.text == "Système d'information de collecte");});
+  var legendAgregationInformationSystems = legend.filter(function (l){ return (l.text == "Système d'information d'aggrégation");});
+  var legendRestitutionInformationSystems = legend.filter(function (l){ return (l.text == "Système d'information de restitution");});
+  // var legendLinkAutomatic = legend.filter( function (l) { return l.type == "automaticlink"});
+  // var legendLinkSemiAutomatic = legend.filter( function (l) { return l.type == "semiautomatic"})
+  // 1 - Elementary variables
+  legendElementaryVariables.append("polygon") 
+    .style("stroke", "black")  // colour the line
+    .style("stroke-WIDTH", "2px")
+    .style("fill", "#FFFFFF")
+    .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } );  // x,y points 
 
-  // // 2 - Calculated variables
-  // legendCalculatedVariables.append("circle")
-  //   .style("stroke", "black")
-  //   .style("stroke-WIDTH", "2px")
-  //   .attr("fill", " #FFFFFF")
-  //   .attr("r", NODE_WIDTH/2)
+  legendElementaryVariables.append("text")
+    .attr("x", function (d) {return 8*d.text.length;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "end")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
-  // // 3 - Information systems
-  // legendCollectInformationSystems.append("rect")
-  //   .style("stroke", strokeColorScale(2))
-  //   .style("stroke-WIDTH", "2px")
-  //   .attr("fill", "#FFFFFF")
-  //   .attr("width", NODE_WIDTH)
-  //   .attr("height", NODE_WIDTH/2)
+  // 2 - Calculated variables
+  legendCalculatedVariables.append("circle")
+    .style("stroke", "black")
+    .style("stroke-WIDTH", "2px")
+    .attr("fill", " #FFFFFF")
+    .attr("r", NODE_WIDTH/4)
 
-  // legendAgregationInformationSystems.append("rect")
-  //   .style("stroke", strokeColorScale(2))
-  //   .style("stroke-WIDTH", "2px")
-  //   .attr("fill", "#FFFFFF")
-  //   .attr("width", NODE_WIDTH)
-  //   .attr("height", NODE_WIDTH/2)
+  legendCalculatedVariables.append("text")
+    .attr("x", function (d) {return 8*d.text.length;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "end")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
-  // legendRestitutionInformationSystems.append("rect")
-  //   .style("stroke", strokeColorScale(3))
-  //   .style("stroke-WIDTH", "2px")
-  //   .attr("fill", "#FFFFFF")
-  //   .attr("width", NODE_WIDTH)
-  //   .attr("height", NODE_WIDTH/2)
+  // 3 - Information systems
+  legendCollectInformationSystems.append("rect")
+    .style("stroke", strokeColorScale(1))
+    .style("stroke-WIDTH", "2px")
+    .attr("fill", "#FFFFFF")
+    .attr("width", NODE_WIDTH)
+    .attr("height", NODE_WIDTH/4)
+
+  legendCollectInformationSystems.append("text")
+    .attr("x", function (d) {return 8*d.text.length;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "end")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });  
+
+
+  legendAgregationInformationSystems.append("rect")
+    .style("stroke", strokeColorScale(2))
+    .style("stroke-WIDTH", "2px")
+    .attr("fill", "#FFFFFF")
+    .attr("width", NODE_WIDTH)
+    .attr("height", NODE_WIDTH/4)
+
+  legendAgregationInformationSystems.append("text")
+    .attr("x", function (d) { return  8*d.text.length;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "end")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
+
+  legendRestitutionInformationSystems.append("rect")
+    .style("stroke", strokeColorScale(3))
+    .style("stroke-WIDTH", "2px")
+    .attr("fill", "#FFFFFF")
+    .attr("width", NODE_WIDTH)
+    .attr("height", NODE_WIDTH/4)
+
+  legendRestitutionInformationSystems.append("text")
+    .attr("x", function (d) {return 8*d.text.length;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "end")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
+
+
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  // Legend interactivity : highlight concerned elements
+  function restoreVariableNode(type){
+    var shape;
+    if ( type == "Variable élémentaire"){
+      nodeVariableElementary.select("polygon")
+        .style("stroke", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
+        .style("fill", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
+    }
+    else {
+      nodeVariableCalculated.select("circle")
+        .style("stroke", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
+        .style("fill", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
+    }
+  }
+
+  function restoreInformationSystems(type){
+    if ( type == )
+  }
+
+  legendElementaryVariables.on("mouseenter", function (){
+    nodeVariableElementary.select("polygon")
+      .attr("fill", "black")
+      .style("stroke", "FFFF00")
+      .style("stroke-WIDTH", "4px")
+  })
+
+  legendCalculatedVariables.on("mouseenter", function (){
+    nodeVariableCalculated.select("circle")
+      .attr("fill", "black")
+      .style("stroke", "FFFF00")
+      .style("stroke-WIDTH", "4px")
+  })
+
+  legendElementaryVariables.on("mouseleave", function (l){
+    restoreVariableNode("Variable élémentaire");
+  })
+
+  legendCalculatedVariables.on("mouseleave", function (l){
+    restoreVariableNode("Variable calculée");
+  })
+
+  // add interactivity to IS
 
 
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -674,6 +770,7 @@ function launchDataVizModuleForAppView() {
   biHiSankey = d3.Sankey_AppView();
   // Set the biHiSankey diagram properties
   biHiSankey
+    .legendData(legendData)
     .informationSystems(vizData.informationSystems)
     .nodeWidth(NODE_WIDTH)
     .nodeSpacing(10)
@@ -868,6 +965,7 @@ function updatePathView(){
     .style("fill", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
     .attr("r", NODE_HEIGHT / 2);
 
+
   nodeVariableElementary.append("polygon")       // attach a polygon
     .style("stroke", "black")  // colour the line
     .style("stroke-WIDTH", "1px")
@@ -887,7 +985,8 @@ function updatePathView(){
           .style("opacity", 1).select(".value")
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
+            // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
+          
           });
     }
   });
@@ -906,10 +1005,12 @@ function updatePathView(){
           .style("opacity", 1).select(".value")
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
+            // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
           });
     }
   });
+
+
 
   node.on("mouseleave", function () {
     if (!isTransitioning) {

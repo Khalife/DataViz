@@ -168,6 +168,7 @@ function applicativeViewTransform(Nodes, Links, vizData){
   ////////////////////////////////////////////////////////////////////////////////////////
   // Creating the new nodes containing the apps
   var nbInformationSystems = vizData.informationSystems.length;
+  var equipe, responsable;
   for (var i = 0; i!= nbInformationSystems; i++){
     position = getSegmentedPosition(i, Nodes.length, vizData.Width);
     var etape;
@@ -175,6 +176,8 @@ function applicativeViewTransform(Nodes, Links, vizData){
     for ( var j = 0; j != Nodes.length; j++){
       if ( Nodes[j]["informationsystem"] == vizData.informationSystems[i] ){
         etape = Nodes[j]["etape"];
+        equipe = Nodes[j]["equipe"];
+        responsable = Nodes[j]["responsable"];
       }
     }
     var newNode = {
@@ -184,7 +187,9 @@ function applicativeViewTransform(Nodes, Links, vizData){
       "name" : vizData.informationSystems[i],
       "x": position[0],
       "y": position[1],
-      "etape" : etape 
+      "etape" : etape,
+      "equipe" : equipe,
+      "responsable" : responsable
       // "width" : defaultWidth/4,
       // "height" : defaultHeight/2
     };
@@ -264,38 +269,44 @@ function applicativeViewTransform(Nodes, Links, vizData){
   
   /////////////////// Creating legend data /////////////////////////////////////////////
   // Include : elementary variable, calculated variable, information systems and links
-  // var nbLegendNodes = 3;
-  // var nbLegendLinks = 4;
-  // var legendNodeText = ["Variable élémentaire", "Variable calculée", "Système d'information"];
-  // var legendLinkText = ["Appartenance variable à un système d'information", "Variable n'impliquant pas de déplacement", "Vérification automatique", "Vérification semi-automatique", "Vérification manuelle"];
+  var nbLegendNodes = 5;
+  var nbLegendLinks = 4;
+  var legendNodeText = ["Variable élémentaire", "Variable calculée", "Système d'information de collecte", "Système d'information d'aggrégation", "Système d'information de restitution"];
+  var legendLinkText = ["Appartenance variable à un système d'information", "Variable n'impliquant pas de déplacement", "Vérification automatique", "Vérification semi-automatique", "Vérification manuelle"];
   var legendData = [];
-  // var margin = 10;
-  // var legendPositions = [];
-  // var nodeWidth = 36;
-  // for (var i = 0; i < nbLegendNodes + nbLegendLinks; i++){
-  //   legendPositions.push([ legendXStart, legendYStart + i*nodeWidth + margin]);
-  // }
+  var legendPositions = [];
+  var nodeWidth = 36;
+  var legendXStart = 1000;
+  var legendYStart = 600;
+  for (var i = 0; i < nbLegendNodes + nbLegendLinks; i++){
+    var xMargin = 0, yMargin = 5;
+    if ( i <= 1 ){ xMargin = nodeWidth/2;}
+    //if ( i <= 2 ){ yMargin = 45;}
+    legendPositions.push([ legendXStart + xMargin, legendYStart + i*(nodeWidth + yMargin)]);
+  }
 
-  // for (var i = 0; i < nbLegendNodes; i++){
-  //   legendData.push({
-  //     "type" : "node",
-  //     "id" : i,
-  //     "text" : legendNodeText[i],
-  //     "x" : legendPositions[i][0],
-  //     "y" : legendPositions[i][1]
-  //   })
+  for (var i = 0; i < nbLegendNodes; i++){
+    legendData.push({
+      "type" : "node",
+      "id" : i,
+      "text" : legendNodeText[i],
+      "x" : legendPositions[i][0],
+      "y" : legendPositions[i][1],
+    })
 
-  // }
-  // var nbLegendLinks = 5;
-  // for (var i = 0; i < nbLegendLinks; i++){
-  //   legendData.push({
-  //     "type" : "link",
-  //     "id" : i + nbLegendNodes,
-  //     "text" : legendLinkText[i],
-  //     "x" : legendPositions[i][0],
-  //     "y" : legendPositions[i][1]
-  //   })
-  // }
+  }
+  var nbLegendLinks = 5;
+  for (var i = 0; i < nbLegendLinks; i++){
+    legendData.push({
+      "type" : "link",
+      "id" : i + nbLegendNodes,
+      "text" : legendLinkText[i],
+      "x" : legendPositions[i][0],
+      "y" : legendPositions[i][1],
+    })
+  }
+
+  //legendData.push({"nodeLegendWidth" : , "rectangleLegendWidth" : });
   //////////////////////////////////////////////////////////////////////////////////////
   NodesAndLinks[0] = NewNodes;
   NodesAndLinks[1] = unique(NewLinks, compareLinkObjects, vizData.nbMaximumNodes);

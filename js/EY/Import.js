@@ -70,8 +70,8 @@ function buildVizData(worksheet, numberOfLineBeginning, numberOfLineEnding){
   for (var i = numberOfLineBeginning; i != numberOfLineEnding; i++){
       if (worksheet["C" + i.toString()]){
         // var tabFields = ["originid", "present","next", "nextIS","previous","informationsystem", "controlquality", "informationtype", "etape"];
-        var tabFields = ["output", "outputId", "presentId", "present", "nextId", "next", "nextIS","previous","informationsystem", "controlquality", "informationtype", "etape"];
-        var tabFieldsColumnLocation = ["A", "B", "D", "C", "AC", "AB", "AD","AF", "Q", "AJ", "F", "P"];
+        var tabFields = ["output", "outputId", "presentId", "present", "nextId", "next", "nextIS","previous","informationsystem", "controlquality", "informationtype", "etape", "equipe", "responsable", "contrôle"];
+        var tabFieldsColumnLocation = ["A", "B", "D", "C", "AC", "AB", "AD","AF", "Q", "AJ", "F", "P", "S", "T", "Z"];
 
         var result = {
           "type": 'Global',
@@ -164,7 +164,9 @@ function createPathNodesAndLinksFromData(data){
       "informationsystem": replaceISname(data[i]["informationsystem"]),
       "informationtype" : data[i]["informationtype"],
       "controlquality" : getControlQuality(data[i]["controlquality"]),
-      "etape" : data[i]["etape"]
+      "etape" : data[i]["etape"],
+      "equipe" : data[i]["equipe"],
+      "responsable" : data[i]["responsable"]
       };
     Nodes.push(newNode);
   }
@@ -181,7 +183,9 @@ function createPathNodesAndLinksFromData(data){
     "informationsystem": "output",
     "informationtype" : "",
     "controlquality" : "",
-    "etape" : ""
+    "etape" : "",
+    "equipe" : "",
+    "responsable" : ""
   }
 
   Nodes.push(outputNode);
