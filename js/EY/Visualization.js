@@ -1,6 +1,6 @@
 ﻿'use strict';
 
-var svg, tooltip, biHiSankey, path, defs, colorScale, highlightColorScale, typeColorScale, isColorScale, strokeColorScale, isTransitioning;
+var svgAppView, svgPathView, tooltipAppView, tooltipPathView, biHiSankeyAppView, biHiSankeyPathView, pathAppView, pathPathView, defs, colorScale, highlightColorScale, typeColorScale, isColorScale, strokeColorScale, isTransitioning;
 
 var OPACITY = {
     NODE_DEFAULT: 0.9,
@@ -21,10 +21,10 @@ var OPACITY = {
   LINK_COLOR = "#b3b3b3",
   INFLOW_COLOR = "#2E86D1",
   OUTFLOW_COLOR = "#D63028",
-  NODE_WIDTH = 36,
-  NODE_HEIGHT = 40,
-  NODE_INFORMATIONSYSTEM_WIDTH = 150,
-  NODE_INFORMATIONSYSTEM_HEIGHT = 75,
+  NODE_WIDTH = 12,
+  NODE_HEIGHT = 27,
+  NODE_INFORMATIONSYSTEM_WIDTH = 80,
+  NODE_INFORMATIONSYSTEM_HEIGHT = 40,
   COLLAPSER = {
     RADIUS: NODE_WIDTH / 2,
     SPACING: 2
@@ -37,9 +37,9 @@ var OPACITY = {
     LEFT: OUTER_MARGIN
   },
   TRANSITION_DURATION = 400,
-  HEIGHT = 1000 - MARGIN.TOP - MARGIN.BOTTOM,
+  HEIGHT = 500 - MARGIN.TOP - MARGIN.BOTTOM,
   // WIDTH = 960 - MARGIN.LEFT - MARGIN.RIGHT,
-  WIDTH = 1500 - MARGIN.LEFT - MARGIN.RIGHT,
+  WIDTH = 1100 - MARGIN.LEFT - MARGIN.RIGHT,
   LAYOUT_INTERATIONS = 32,
   REFRESH_INTERVAL = 7000,
 
@@ -67,14 +67,14 @@ disableUserInterractions = function (time) {
   }, time);
 },
 
-hideTooltip = function () {
-  return tooltip.transition()
+hideAppTooltip = function () {
+  return tooltipAppView.transition()
     .duration(TRANSITION_DURATION)
     .style("opacity", 0);
 },
 
-showTooltip = function () {
-  return tooltip
+showAppTooltip = function () {
+  return tooltipAppView
     .style("left", d3.event.pageX + "px")
     .style("top", d3.event.pageY + 15 + "px")
     .transition()
@@ -82,17 +82,30 @@ showTooltip = function () {
       .style("opacity", 1);
 };
 
-function showHideChildren(node) {
+function showHideAppChildren(node) {
   disableUserInterractions(2 * TRANSITION_DURATION);
-  hideTooltip();
+  hideAppTooltip();
   if (node.state === "collapsed") { expand(node); }
   else { collapse(node); }
 
-  biHiSankey.relayout();
-  update();
-  link.attr("d", path);
+  biHiSankeyAppView.relayout();
+  updateAppView();
+  link.attr("d", pathAppView);
   restoreLinksAndNodes();
 }
+
+function showHidePathChildren(node){
+  disableUserInterractions(2 * TRANSITION_DURATION);
+  hidePathTooltip();
+  if (node.state === "collapsed") { expand(node);}
+  else { collapse(node); }
+
+  biHiSankeyPathView.relayout();
+  updatePathView();
+  link.attr("d", pathAppView);
+  restoreLinksAndNodes();
+}
+
 
 
 colorScale = d3.scale.ordinal().domain(TYPES).range(TYPE_COLORS),
@@ -100,26 +113,24 @@ highlightColorScale = d3.scale.ordinal().domain(TYPES).range(TYPE_HIGHLIGHT_COLO
 typeColorScale = d3.scale.ordinal().domain(LINK_TYPES).range(LINK_TYPES_COLORS),
 strokeColorScale = d3.scale.ordinal().domain(STROKE_TYPES).range(STROKE_TYPES_COLORS),
 
-svg = d3.select("#chart").append("svg")
+svgAppView = d3.select("#chart-applicative").append("svg")
         .attr("width", WIDTH + MARGIN.LEFT + MARGIN.RIGHT)
         .attr("height", HEIGHT + MARGIN.TOP + MARGIN.BOTTOM)
-      .append("g")
+        .append("g")
         .attr("transform", "translate(" + MARGIN.LEFT + "," + MARGIN.TOP + ")");
 
-svg.append("g").attr("id", "links");
-svg.append("g").attr("id", "nodes");
-svg.append("g").attr("id", "collapsers");
-svg.append("g").attr("id", "legend");
+svgAppView.append("g").attr("id", "links");
+svgAppView.append("g").attr("id", "nodes");
+svgAppView.append("g").attr("id", "collapsers");
+svgAppView.append("g").attr("id", "legend");
 
-tooltip = d3.select("#chart").append("div").attr("id", "tooltip");
+tooltipAppView = d3.select("#chart-applicative").append("div").attr("id", "tooltipAppView");
 
-tooltip.style("opacity", 0)
+tooltipAppView.style("opacity", 0)
     .append("p")
       .attr("class", "value");
 
-
-
-defs = svg.append("defs");
+defs = svgAppView.append("defs");
 
 defs.append("marker")
   .style("fill", LINK_COLOR)
@@ -173,6 +184,76 @@ defs.append("marker")
   .append("path")
     .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
+svgPathView = d3.select("#chart-path").append("svg")
+        .attr("width", WIDTH + MARGIN.LEFT + MARGIN.RIGHT)
+        .attr("height", HEIGHT + MARGIN.TOP + MARGIN.BOTTOM)
+        .append("g")
+        .attr("transform", "translate(" + MARGIN.LEFT + "," + MARGIN.TOP + ")");
+
+svgPathView.append("g").attr("id", "links");
+svgPathView.append("g").attr("id", "nodes");
+svgPathView.append("g").attr("id", "collapsers");
+svgPathView.append("g").attr("id", "legend");
+
+tooltipPathView = d3.select("#chart-path").append("div").attr("id", "tooltipPathView");
+
+tooltipAppView.style("opacity", 0)
+    .append("p")
+      .attr("class", "value");
+
+defs = svgPathView.append("defs");
+
+defs.append("marker")
+  .style("fill", LINK_COLOR)
+  .attr("id", "arrowVerticalHead")
+  .attr("viewBox", "0 0 6 10")
+  .attr("refX", "1")
+  .attr("refY", "5")
+  .attr("markerUnits", "strokeWidth")
+  .attr("markerWidth", "1")
+  .attr("markerHeight", "1")
+  .attr("orient", 270)
+  .append("path")
+    .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
+
+defs.append("marker")
+  .style("fill", LINK_COLOR)
+  .attr("id", "arrowHorizontalHead")
+  .attr("viewBox", "0 0 6 10")
+  .attr("refX", "1")
+  .attr("refY", "5")
+  .attr("markerUnits", "strokeWidth")
+  .attr("markerWidth", "1")
+  .attr("markerHeight", "1")
+  .attr("orient", "auto")
+  .append("path")
+    .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
+
+defs.append("marker")
+  .style("fill", OUTFLOW_COLOR)
+  .attr("id", "arrowHeadInflow")
+  .attr("viewBox", "0 0 6 10")
+  .attr("refX", "1")
+  .attr("refY", "5")
+  .attr("markerUnits", "strokeWidth")
+  .attr("markerWidth", "1")
+  .attr("markerHeight", "1")
+  .attr("orient", "auto")
+  .append("path")
+    .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
+
+defs.append("marker")
+  .style("fill", INFLOW_COLOR)
+  .attr("id", "arrowHeadOutflow")
+  .attr("viewBox", "0 0 6 10")
+  .attr("refX", "1")
+  .attr("refY", "5")
+  .attr("markerUnits", "strokeWidth")
+  .attr("markerWidth", "1")
+  .attr("markerHeight", "1")
+  .attr("orient", "auto")
+  .append("path")
+    .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
 // function highlightConnected(g) {
 //   link.filter(function (d) { return d.source === g; })
@@ -206,9 +287,9 @@ function updateAppView () {
     node.x = Math.max(0, Math.min(WIDTH - node.width, d3.event.x));
     node.y = Math.max(0, Math.min(HEIGHT - node.height, d3.event.y));
     d3.select(this).attr("transform", "translate(" + node.x + "," + node.y + ")");
-    biHiSankey.relayout();
-    svg.selectAll(".node").selectAll("rect").attr("height", function (d) { return d.height; });
-    link.attr("d", path);
+    biHiSankeyAppView.relayout();
+    svgAppView.selectAll(".node").selectAll("rect").attr("height", function (d) { return d.height; });
+    link.attr("d", pathAppView);
   }
 
   function containChildren(node) {
@@ -297,13 +378,13 @@ function updateAppView () {
   }
 
 
-  link = svg.select("#links").selectAll("path.link")
-    .data(biHiSankey.visibleLinks(), function (d) { return d.id; });
+  link = svgAppView.select("#links").selectAll("path.link")
+    .data(biHiSankeyAppView.visibleLinks(), function (d) { return d.id; });
 
   link.transition()
     .duration(TRANSITION_DURATION)
     .style("stroke-WIDTH", function (d) { return Math.max(1, d.thickness); })
-    .attr("d", path)
+    .attr("d", pathAppView)
     .style("opacity", OPACITY.LINK_DEFAULT);
 
 
@@ -312,7 +393,7 @@ function updateAppView () {
 
   linkEnter = link.enter().append("path")
     .attr("class", "link")
-    .style("fill", function (d){return typeColorScale(d.type);});
+    .style("fill", function (d){return "white";/*typeColorScale(d.type);*/});
 
   // linkEnter.on('mouseenter', function (d) {
   //   if (!isTransitioning) {
@@ -366,12 +447,13 @@ function updateAppView () {
     .transition()
       .delay(TRANSITION_DURATION)
       .duration(TRANSITION_DURATION)
-      .attr("d", path)
+      .attr("d", pathAppView)
       .style("stroke-WIDTH", function (d) { return Math.max(1, d.thickness); })
+      .style("stroke-dasharray", function (d) { return (d.dash || ""); })
       .style("opacity", OPACITY.LINK_DEFAULT);
 
-  node = svg.select("#nodes").selectAll(".node")
-      .data(biHiSankey.collapsedNodes(), function (d) { return d.id; });
+  node = svgAppView.select("#nodes").selectAll(".node")
+      .data(biHiSankeyAppView.collapsedNodes(), function (d) { return d.id; });
   // nodesByXPosition.forEach(function (nodes) {
   //   nodes.forEach(function (node, i) {
   //     node.y = i;
@@ -398,7 +480,7 @@ function updateAppView () {
       .style("stroke", function (d) { return d3.rgb(colorScale(d.type.replace(/ .*/, ""))).darker(0.1); })
       .style("stroke-WIDTH", "1px")
       .attr("height", function (d) { return NODE_HEIGHT; })
-      .attr("width", biHiSankey.nodeWidth());
+      .attr("width", biHiSankeyAppView.nodeWidth());
 
 
   node.exit()
@@ -460,11 +542,11 @@ function updateAppView () {
     })
     .style("stroke", function (d) {
     // var strokeIndex = threeStepFunction(informationSystems.indexOf(d.name), informationSystems); return d3.rgb(strokeColorScale(strokeIndex)).darker(0.1);
-    var etape = eliminateStepStringError(d.etape); return d3.rgb(strokeColorScale(etape)).darker(0.1); 
+    var etape = eliminateStepStringError(d.etape); return d3.rgb(strokeColorScale(etape)); 
     }) // stroke color : depending on the position of the information system in the list
     .style("stroke-WIDTH", "3px")
     .attr("height", NODE_INFORMATIONSYSTEM_HEIGHT)
-    //.attr("width", biHiSankey.nodeWidth());
+    //.attr("width", biHiSankeyAppView.nodeWidth());
     .attr("width", NODE_INFORMATIONSYSTEM_WIDTH)
 
   var nodeVariableCalculated = node.filter(function (d){ return ( ( d.type === "variable" ) && ( d.iscalculated ) ) ;});
@@ -515,7 +597,7 @@ function updateAppView () {
   nodeVariableCalculated.on("mouseEnter", function (g){
     if (!isTransitioning){
       restoreLinksAndNodes();
-      tooltip
+      tooltipAppView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
@@ -533,7 +615,7 @@ function updateAppView () {
   nodeVariableElementary.on("mouseEnter", function (g){
     if (!isTransitioning){
       restoreLinksAndNodes();
-      tooltip
+      tooltipAppView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
@@ -551,7 +633,7 @@ function updateAppView () {
   nodeInformationSystem.on("mouseenter", function (g){
     if (!isTransitioning){
       restoreLinksAndNodes();
-      tooltip
+      tooltipAppView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
@@ -568,13 +650,13 @@ function updateAppView () {
 
   node.on("mouseleave", function () {
     if (!isTransitioning) {
-      hideTooltip();
+      hideAppTooltip();
       restoreLinksAndNodes();
     }
   });
 
   node.filter(function (d) { return d.children.length; })
-    .on("dblclick", showHideChildren);
+    .on("dblclick", showHideAppChildren);
 
   // allow nodes to be dragged to new positions
   node.call(d3.behavior.drag()
@@ -592,7 +674,7 @@ function updateAppView () {
   //     .attr("transform", null)
   //     .text(function (d) { return d.name; })
   //   .filter(function (d) { return d.x < WIDTH / 2; })
-  //     .attr("x", 6 + biHiSankey.nodeWidth())
+  //     .attr("x", 6 + biHiSankeyAppView.nodeWidth())
   //     .attr("text-anchor", "start");
 
   nodeInformationSystem.select("text")
@@ -619,16 +701,63 @@ function updateAppView () {
   /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   // Legend - to be included in a collapser ?!
   // var legendData = [{"id" : 1, "type" : "elementaryVariable", "x" : 400, "y" : 800}];
-  legend = svg.select("#legend").selectAll(".legend").data(biHiSankey.legendData(), function (l) { return l.id; }); // intermediate
+  legend = svgAppView.select("#legend").selectAll(".legend").data(biHiSankeyAppView.legendData(), function (l) { return l.id; }); // intermediate
+
+  function computePolygonCoordonates(radius){
+    // Function to be called inside function to draw polygon (svg)
+    // Returns hexagone local coordinates starting from top left corner, in string form to be used with SVG
+    var corners = [], cornersString = "";
+    // corners.push([node.x - radius / 2, node.y - radius]);
+    // corners.push([ node.x + radius / 2, node.y - radius]);
+    // corners.push([ node.x + radius, node.y ]);
+    // corners.push([ node.x + radius / 2, node.y + radius]);
+    // corners.push([ node.x - radius / 2, node.y + radius]);
+    // corners.push([ node.x - radius, node.y]);
+
+    corners.push([ - radius / 2, - radius]);
+    corners.push([ radius / 2, - radius]);
+    corners.push([ radius, 0 ]);
+    corners.push([ radius / 2, radius]);
+    corners.push([ - radius / 2,  radius]);
+    corners.push([ - radius, 0]);
+    
+    for (var i = 0; i != 5; i++){
+      cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
+    }
+    cornersString = cornersString + corners[5][0].toString() + "," + corners[5][1].toString();
+    return cornersString;
+  }
+
+  function computeLinkPolygonCoordonates(radius){
+    // Function used to compute polygon coordonates
+    // Returns link local coordinates starting from top left corner, in string form to be used with SVG
+    var corners = [], cornersString = "";
+    corners.push([ 0, - radius/4]);
+    corners.push([ 2*radius, -radius/4]);
+    corners.push([ 2*radius + radius/4, 0]);
+    corners.push([ 2*radius, radius/4]);
+    corners.push([ 0,  radius/4]);
+    
+    for (var i = 0; i != 4; i++){
+      cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
+    }
+    cornersString = cornersString + corners[4][0].toString() + "," + corners[4][1].toString();
+    return cornersString;
+  }
+
   var legendEnter = legend.enter().append("g")
                       .attr("class", "legend")
                       .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";})
 
   var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );});
   var legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );});
-  var legendCollectInformationSystems = legend.filter(function (l){ return (l.text == "Système d'information de collecte");});
-  var legendAgregationInformationSystems = legend.filter(function (l){ return (l.text == "Système d'information d'aggrégation");});
-  var legendRestitutionInformationSystems = legend.filter(function (l){ return (l.text == "Système d'information de restitution");});
+  var legendCollectInformationSystems = legend.filter(function (l){ return (l.text == "SI de collecte");});
+  var legendAgregationInformationSystems = legend.filter(function (l){ return (l.text == "SI d'aggrégation");});
+  var legendRestitutionInformationSystems = legend.filter(function (l){ return (l.text == "SI de restitution");});
+  var legendVariableISLink = legend.filter(function (l){ return l.text == "Appartenance variable à un SI";});
+  var legendAutomaticLink = legend.filter(function (l){ return l.text == "Vérification automatique";});
+  var legendSemiAutomaticLink = legend.filter(function (l){ return l.text == "Vérification semi-automatique";});
+  var legendManualLink = legend.filter(function (l){ return l.text == "Vérification manuelle"});
   // var legendLinkAutomatic = legend.filter( function (l) { return l.type == "automaticlink"});
   // var legendLinkSemiAutomatic = legend.filter( function (l) { return l.type == "semiautomatic"})
   // 1 - Elementary variables
@@ -639,10 +768,10 @@ function updateAppView () {
     .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } );  // x,y points 
 
   legendElementaryVariables.append("text")
-    .attr("x", function (d) {return 8*d.text.length;})
+    .attr("x", function (d) {return "20px";})
     .attr("y", function (d) {return 0;})
     .attr("dy", ".35em")
-    .attr("text-anchor", "end")
+    .attr("text-anchor", "start")
     .attr("transform", null)
     .text(function (d) { return d.text; });
 
@@ -651,13 +780,13 @@ function updateAppView () {
     .style("stroke", "black")
     .style("stroke-WIDTH", "2px")
     .attr("fill", " #FFFFFF")
-    .attr("r", NODE_WIDTH/4)
+    .attr("r", NODE_WIDTH/2)
 
   legendCalculatedVariables.append("text")
-    .attr("x", function (d) {return 8*d.text.length;})
+    .attr("x", function (d) {return "20px";})
     .attr("y", function (d) {return 0;})
     .attr("dy", ".35em")
-    .attr("text-anchor", "end")
+    .attr("text-anchor", "start")
     .attr("transform", null)
     .text(function (d) { return d.text; });
 
@@ -666,14 +795,16 @@ function updateAppView () {
     .style("stroke", strokeColorScale(1))
     .style("stroke-WIDTH", "2px")
     .attr("fill", "#FFFFFF")
-    .attr("width", NODE_WIDTH)
-    .attr("height", NODE_WIDTH/4)
+    .attr("x", function(d) {return "8px";})
+    .attr("y", function(d) {return -NODE_WIDTH/2;})
+    .attr("width", NODE_HEIGHT/2)
+    .attr("height", NODE_WIDTH)
 
   legendCollectInformationSystems.append("text")
-    .attr("x", function (d) {return 8*d.text.length;})
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
     .attr("y", function (d) {return 0;})
     .attr("dy", ".35em")
-    .attr("text-anchor", "end")
+    .attr("text-anchor", "start")
     .attr("transform", null)
     .text(function (d) { return d.text; });  
 
@@ -682,31 +813,77 @@ function updateAppView () {
     .style("stroke", strokeColorScale(2))
     .style("stroke-WIDTH", "2px")
     .attr("fill", "#FFFFFF")
-    .attr("width", NODE_WIDTH)
-    .attr("height", NODE_WIDTH/4)
+    .attr("x", function(d) {return "8px";})
+    .attr("y", function(d) {return -NODE_WIDTH/2;})
+    .attr("width", NODE_HEIGHT/2)
+    .attr("height", NODE_WIDTH)
 
   legendAgregationInformationSystems.append("text")
-    .attr("x", function (d) { return  8*d.text.length;})
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
     .attr("y", function (d) {return 0;})
     .attr("dy", ".35em")
-    .attr("text-anchor", "end")
+    .attr("text-anchor", "start")
     .attr("transform", null)
-    .text(function (d) { return d.text; });
+    .text(function (d) { return d.text; });  
 
   legendRestitutionInformationSystems.append("rect")
     .style("stroke", strokeColorScale(3))
     .style("stroke-WIDTH", "2px")
     .attr("fill", "#FFFFFF")
-    .attr("width", NODE_WIDTH)
-    .attr("height", NODE_WIDTH/4)
+    .attr("x", function(d) {return "8px";})
+    .attr("y", function(d) {return -NODE_WIDTH/2;})
+    .attr("width", NODE_HEIGHT/2)
+    .attr("height", NODE_WIDTH)
 
   legendRestitutionInformationSystems.append("text")
-    .attr("x", function (d) {return 8*d.text.length;})
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
     .attr("y", function (d) {return 0;})
     .attr("dy", ".35em")
-    .attr("text-anchor", "end")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });  
+
+  legendAutomaticLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
     .attr("transform", null)
     .text(function (d) { return d.text; });
+
+  legendAutomaticLink.append("polygon")
+    .style("stroke", "#a6d854")  // colour the line
+    .style("stroke-WIDTH", "2px")
+    .style("fill", "#a6d854")
+    .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
+
+  legendSemiAutomaticLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
+
+  legendSemiAutomaticLink.append("polygon")
+    .style("stroke", "#fc8d62")  // colour the line
+    .style("stroke-WIDTH", "2px")
+    .style("fill", "#fc8d62")
+    .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
+
+  legendManualLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
+
+  legendManualLink.append("polygon")
+    .style("stroke", "#8da0cb")  // colour the line
+    .style("stroke-WIDTH", "2px")
+    .style("fill", "#8da0cb")
+    .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
 
 
 
@@ -727,7 +904,7 @@ function updateAppView () {
   }
 
   function restoreInformationSystems(type){
-    if ( type == )
+    // if ( type == )
   }
 
   legendElementaryVariables.on("mouseenter", function (){
@@ -761,15 +938,15 @@ function updateAppView () {
 function launchDataVizModuleForAppView() {
 
   var vizData = { WIDTH : 1000, nbMaximumNodes : 1000, defaultWidth : 85, defaultHeight : 60};
-  var NodesCharacteristics = applicativeViewTransform(NodesAndLinks[0], NodesAndLinks[1], vizData);
+  var NodesCharacteristicsForAppView = applicativeViewTransform(NodesAndLinksForAppView[0], NodesAndLinksForAppView[1], vizData);
   var IS_COLORS = [];
   var IS_NUMBERS = []; 
-  var legendData = NodesCharacteristics[2];
+  var legendData = NodesCharacteristicsForAppView[2];
   for (var i = 0; i < vizData.informationSystems.length; i++){ IS_NUMBERS.push(i+1); IS_COLORS.push(IS_COLORS_STOCK[i]);}; 
   isColorScale = d3.scale.ordinal().domain(vizData.informationSystems).range(IS_COLORS);
-  biHiSankey = d3.Sankey_AppView();
-  // Set the biHiSankey diagram properties
-  biHiSankey
+  biHiSankeyAppView = d3.Sankey_AppView();
+  // Set the biHiSankeyAppView diagram properties
+  biHiSankeyAppView
     .legendData(legendData)
     .informationSystems(vizData.informationSystems)
     .nodeWidth(NODE_WIDTH)
@@ -778,10 +955,10 @@ function launchDataVizModuleForAppView() {
     .arrowheadScaleFactor(0.5) // Specifies that 0.5 of the link's stroke WIDTH should be allowed for the marker at the end of the link.
     .size([WIDTH, HEIGHT]);
 
-  path = biHiSankey.link().curvature(0.45);
-  biHiSankey
-    .nodes(NodesCharacteristics[0])
-    .links(NodesCharacteristics[1])
+  pathAppView = biHiSankeyAppView.link().curvature(0.45);
+  biHiSankeyAppView
+    .nodes(NodesCharacteristicsForAppView[0])
+    .links(NodesCharacteristicsForAppView[1])
     //.nodes([{"Application" : "Picasso", "name": "First node", "type" : "Elémentaire", "id" : "1", "originid" : "1"}, {"Application" : "Fermat", "name": "Second node", "type" : "Calculée", "id" : "2", "originid" : "2"}, {"Application" : "Fermat", "name": "Third node", "type": "Calculée", "id" : "3", "originid" : "3"}])
     //.links([{"source": "1", "target": "2", "value": "1", "type": "type1"}, {"source": "2", "target" : "3", "value" : "1", "type": "type2"}])
     .initializeNodes(function (node) {
@@ -804,9 +981,9 @@ function updatePathView(){
     node.x = Math.max(0, Math.min(WIDTH - node.width, d3.event.x));
     node.y = Math.max(0, Math.min(HEIGHT - node.height, d3.event.y));
     d3.select(this).attr("transform", "translate(" + node.x + "," + node.y + ")");
-    biHiSankey.relayout();
-    svg.selectAll(".node").selectAll("rect").attr("height", function (d) { return d.height; });
-    link.attr("d", path);
+    biHiSankeyPathView.relayout();
+    svgPathView.selectAll(".node").selectAll("rect").attr("height", function (d) { return d.height; });
+    link.attr("d", pathPathView);
   }
 
   function containChildren(node) {
@@ -835,7 +1012,6 @@ function updatePathView(){
 
   function restoreLinksAndNodes() {
     link
-      .style("stroke", function (d){return typeColorScale(d.type);})
       .style("marker-end", function (d) { if ( d.source == "variable"){ return 'url(#arrowVerticalHead)';} else { return 'url(#arrowHorizontalHead)';} }) //return 'url(#arrowHead)'; })
       .transition()
         .duration(TRANSITION_DURATION)
@@ -869,16 +1045,12 @@ function updatePathView(){
       .attr("height", NODE_INFORMATIONSYSTEM_HEIGHT);
   }
 
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////
+  // Nodes
   function computePolygonCoordonates(radius){
     // Function to be called inside function to draw polygon (svg)
     // Returns hexagone local coordinates starting from top left corner, in string form to be used with SVG
     var corners = [], cornersString = "";
-    // corners.push([node.x - radius / 2, node.y - radius]);
-    // corners.push([ node.x + radius / 2, node.y - radius]);
-    // corners.push([ node.x + radius, node.y ]);
-    // corners.push([ node.x + radius / 2, node.y + radius]);
-    // corners.push([ node.x - radius / 2, node.y + radius]);
-    // corners.push([ node.x - radius, node.y]);
 
     corners.push([ - radius / 2, - radius]);
     corners.push([ radius / 2, - radius]);
@@ -893,12 +1065,9 @@ function updatePathView(){
     cornersString = cornersString + corners[5][0].toString() + "," + corners[5][1].toString();
     return cornersString;
   }
-
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Nodes
   var node, nodeEnter;
-  node = svg.select("#nodes").selectAll(".node")
-      .data(biHiSankey.collapsedNodes(), function (d) { return d.id; });
+  node = svgPathView.select("#nodes").selectAll(".node")
+      .data(biHiSankeyPathView.collapsedNodes(), function (d) { return d.id; });
 
   node.transition()
     .duration(TRANSITION_DURATION)
@@ -912,7 +1081,7 @@ function updatePathView(){
       .style("stroke", function (d) { return d3.rgb(colorScale(d.type.replace(/ .*/, ""))).darker(0.1); })
       .style("stroke-WIDTH", "1px")
       .attr("height", function (d) { return NODE_HEIGHT; })
-      .attr("width", biHiSankey.nodeWidth());
+      .attr("width", biHiSankeyPathView.nodeWidth());
 
 
   node.exit()
@@ -977,7 +1146,7 @@ function updatePathView(){
     if (!isTransitioning) {
       // highlightConnected(g);
       restoreLinksAndNodes();
-      tooltip
+      tooltipAppView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
@@ -991,13 +1160,12 @@ function updatePathView(){
     }
   });
 
-
   // Mouse enter event used for information system and variable viz
   node.on("mouseenter", function (g) {
     if (!isTransitioning) {
       // highlightConnected(g);
       restoreLinksAndNodes();
-      tooltip
+      tooltipAppView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
@@ -1010,17 +1178,15 @@ function updatePathView(){
     }
   });
 
-
-
   node.on("mouseleave", function () {
     if (!isTransitioning) {
-      hideTooltip();
+      hideAppTooltip();
       restoreLinksAndNodes();
     }
   });
 
   node.filter(function (d) { return d.children.length; })
-    .on("dblclick", showHideChildren);
+    .on("dblclick", showHidePathChildren);
 
   // allow nodes to be dragged to new positions
   node.call(d3.behavior.drag()
@@ -1039,48 +1205,26 @@ function updatePathView(){
   ///////////////////////////////////////////////////////////////////////////////////////////////////////
   // Links
   var link, linkEnter;
-  link = svg.select("#links").selectAll("path.link")
-    .data(biHiSankey.visibleLinks(), function (d) { return d.id; });
-  link.transition()
-    .duration(TRANSITION_DURATION)
-    .style("stroke-WIDTH", function (d) { return Math.max(1, d.thickness); })
-    .attr("d", path)
-    .style("opacity", OPACITY.LINK_DEFAULT);
+  link = svgPathView.select("#links").selectAll("path.link")
+    .data(biHiSankeyPathView.visibleLinks(), function (d) { return d.id; });
 
   link.exit().remove();
 
   linkEnter = link.enter().append("path")
     .attr("class", "link")
-    .style("fill", function (d){return typeColorScale(d.type);});
+    .style("fill", function (d){return "white"; /*typeColorScale(d.controlquality);*/})
+    .style("stroke", function (d){return typeColorScale(d.controlquality);}) // colour the line
+    .style("stroke-dasharray", function (d){ return d.dash || "";})
 
-  // linkEnter.on('mouseenter', function (d) {
-  //   if (!isTransitioning) {
-  //     showTooltip().select(".value").text(function () {
-  //       if (d.direction > 0) {
-  //         return d.source.name + " → " + d.target.name + "\n" + formatNumber(d.value);
-  //       }
-  //       return d.target.name + " ← " + d.source.name + "\n" + formatNumber(d.value);
-  //     });
+  var linkAutomatedControl = link.filter(function (l){ return l.controlnature == 1;});
+  var linkSemiAutomatic = link.filter(function (l) { return l.controlnature == 2;});
+  var linkManual = link.filter(function (l){ return l.controlnature == 3;});
 
-  //     d3.select(this)
-  //       .style("stroke", function (d){return typeColorScale(d.type);})
-  //       .transition()
-  //         .duration(TRANSITION_DURATION / 2)
-  //         .style("opacity", OPACITY.LINK_HIGHLIGHT);
-  //   }
-  // });
 
-  // linkEnter.on('mouseleave', function () {
-  //   if (!isTransitioning) {
-  //     hideTooltip();
+  linkManual
+    .attr({"stroke-dasharray": "5,5"});
 
-  //     d3.select(this)
-  //       .style("stroke", function (d){return typeColorScale(d.type);})
-  //       .transition()
-  //         .duration(TRANSITION_DURATION / 2)
-  //         .style("opacity", OPACITY.LINK_DEFAULT);
-  //   }
-  // });
+
 
   // To include link type dependancy for arrowhead : marker-head
   linkEnter.sort(function (a, b) { return b.thickness - a.thickness; })
@@ -1100,29 +1244,168 @@ function updatePathView(){
       }
     })
     //.style("stroke", LINK_COLOR)
-    .style("stroke", function (d){return typeColorScale(d.type);})
-    .style("opacity", 0)
     .transition()
       .delay(TRANSITION_DURATION)
       .duration(TRANSITION_DURATION)
-      .attr("d", path)
+      .attr("d", pathPathView)
       .style("stroke-WIDTH", function (d) { return Math.max(1, d.thickness); })
       .style("opacity", OPACITY.LINK_DEFAULT);
 
+
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Legend part
+    // var legend = svgPathView.select("#links").selectAll("path.link")
+    //                     .data(biHiSankeyAppView.legendData, function (d) { return d.id; });;
+
+    // var legendEnter = legend.enter().append("g")
+    //                   .attr("class", "legend")
+    //                   .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";})
+
+    // var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );});
+    // var legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );});
+    // var legendAutomaticLink = legend.filter(function (l){ return l.text == "Vérification automatique";});
+    // var legendSemiAutomaticLink = legend.filter(function (l){ return l.text == "Vérification semi-automatique";});
+    // var legendManualLink = legend.filter(function (l){ return l.text == "Vérification manuelle"});
+    // // var legendLinkAutomatic = legend.filter( function (l) { return l.type == "automaticlink"});
+    // // var legendLinkSemiAutomatic = legend.filter( function (l) { return l.type == "semiautomatic"})
+    // // 1 - Elementary variables
+    // legendElementaryVariables.append("polygon") 
+    //   .style("stroke", "black")  // colour the line
+    //   .style("stroke-WIDTH", "2px")
+    //   .style("fill", "#FFFFFF")
+    //   .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } );  // x,y points 
+
+    // legendElementaryVariables.append("text")
+    //   .attr("x", function (d) {return "20px";})
+    //   .attr("y", function (d) {return 0;})
+    //   .attr("dy", ".35em")
+    //   .attr("text-anchor", "start")
+    //   .attr("transform", null)
+    //   .text(function (d) { return d.text; });
+
+    // // 2 - Calculated variables
+    // legendCalculatedVariables.append("circle")
+    //   .style("stroke", "black")
+    //   .style("stroke-WIDTH", "2px")
+    //   .attr("fill", " #FFFFFF")
+    //   .attr("r", NODE_WIDTH/2)
+
+    // legendCalculatedVariables.append("text")
+    //   .attr("x", function (d) {return "20px";})
+    //   .attr("y", function (d) {return 0;})
+    //   .attr("dy", ".35em")
+    //   .attr("text-anchor", "start")
+    //   .attr("transform", null)
+    //   .text(function (d) { return d.text; });
+
+    // // 3 - Information systems
+    // legendCollectInformationSystems.append("rect")
+    //   .style("stroke", strokeColorScale(1))
+    //   .style("stroke-WIDTH", "2px")
+    //   .attr("fill", "#FFFFFF")
+    //   .attr("x", function(d) {return "8px";})
+    //   .attr("y", function(d) {return -NODE_WIDTH/2;})
+    //   .attr("width", NODE_HEIGHT/2)
+    //   .attr("height", NODE_WIDTH)
+
+    // legendCollectInformationSystems.append("text")
+    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
+    //   .attr("y", function (d) {return 0;})
+    //   .attr("dy", ".35em")
+    //   .attr("text-anchor", "start")
+    //   .attr("transform", null)
+    //   .text(function (d) { return d.text; });  
+
+
+    // legendAgregationInformationSystems.append("rect")
+    //   .style("stroke", strokeColorScale(2))
+    //   .style("stroke-WIDTH", "2px")
+    //   .attr("fill", "#FFFFFF")
+    //   .attr("x", function(d) {return "8px";})
+    //   .attr("y", function(d) {return -NODE_WIDTH/2;})
+    //   .attr("width", NODE_HEIGHT/2)
+    //   .attr("height", NODE_WIDTH)
+
+    // legendAgregationInformationSystems.append("text")
+    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
+    //   .attr("y", function (d) {return 0;})
+    //   .attr("dy", ".35em")
+    //   .attr("text-anchor", "start")
+    //   .attr("transform", null)
+    //   .text(function (d) { return d.text; });  
+
+    // legendRestitutionInformationSystems.append("rect")
+    //   .style("stroke", strokeColorScale(3))
+    //   .style("stroke-WIDTH", "2px")
+    //   .attr("fill", "#FFFFFF")
+    //   .attr("x", function(d) {return "8px";})
+    //   .attr("y", function(d) {return -NODE_WIDTH/2;})
+    //   .attr("width", NODE_HEIGHT/2)
+    //   .attr("height", NODE_WIDTH)
+
+    // legendRestitutionInformationSystems.append("text")
+    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
+    //   .attr("y", function (d) {return 0;})
+    //   .attr("dy", ".35em")
+    //   .attr("text-anchor", "start")
+    //   .attr("transform", null)
+    //   .text(function (d) { return d.text; });  
+
+    // legendAutomaticLink.append("text")
+    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    //   .attr("y", function (d) {return 0;})
+    //   .attr("dy", ".35em")
+    //   .attr("text-anchor", "start")
+    //   .attr("transform", null)
+    //   .text(function (d) { return d.text; });
+
+    // legendAutomaticLink.append("polygon")
+    //   .style("stroke", "#a6d854")  // colour the line
+    //   .style("stroke-WIDTH", "2px")
+    //   .style("fill", "#a6d854")
+    //   .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
+
+    // legendSemiAutomaticLink.append("text")
+    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    //   .attr("y", function (d) {return 0;})
+    //   .attr("dy", ".35em")
+    //   .attr("text-anchor", "start")
+    //   .attr("transform", null)
+    //   .text(function (d) { return d.text; });
+
+    // legendSemiAutomaticLink.append("polygon")
+    //   .style("stroke", "#fc8d62")  // colour the line
+    //   .style("stroke-WIDTH", "2px")
+    //   .style("fill", "#fc8d62")
+    //   .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
+
+    // legendManualLink.append("text")
+    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    //   .attr("y", function (d) {return 0;})
+    //   .attr("dy", ".35em")
+    //   .attr("text-anchor", "start")
+    //   .attr("transform", null)
+    //   .text(function (d) { return d.text; });
+
+    // legendManualLink.append("polygon")
+    //   .style("stroke", "#8da0cb")  // colour the line
+    //   .style("stroke-WIDTH", "2px")
+    //   .style("fill", "#8da0cb")
+    //   .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
 }
 
-
 function launchDataVizModuleForPathView() {
+
   var vizData = {'nbMaximumNodes' : 1000, 'defaultWidth' : 85, 'defaultHeight' : 60};
-  var NodesCharacteristics = pathViewTransform(NodesAndLinks[0], NodesAndLinks[1], vizData);
+  var NodesCharacteristicsForPathView = pathViewTransform(NodesAndLinksForPathView[0], NodesAndLinksForPathView[1], vizData);
   var IS_COLORS = [];
   var IS_NUMBERS = []; 
   //var legendData = NodesCharacteristics[2];
   for (var i = 0; i < vizData.informationSystems.length; i++){ IS_NUMBERS.push(i+1); IS_COLORS.push(IS_COLORS_STOCK[i]);}; 
   isColorScale = d3.scale.ordinal().domain(vizData.informationSystems).range(IS_COLORS);
-  biHiSankey = d3.Sankey_PathView();
-  // Set the biHiSankey diagram properties
-  biHiSankey
+  biHiSankeyPathView = d3.Sankey_PathView();
+  // Set the biHiSankeyPathView diagram properties
+  biHiSankeyPathView
     .informationSystems(vizData.informationSystems)
     .nodeWidth(NODE_WIDTH)
     .nodeSpacing(10)
@@ -1130,10 +1413,10 @@ function launchDataVizModuleForPathView() {
     .arrowheadScaleFactor(0.5) // Specifies that 0.5 of the link's stroke WIDTH should be allowed for the marker at the end of the link.
     .size([WIDTH, HEIGHT]);
 
-  path = biHiSankey.link().curvature(0.45);
-  biHiSankey
-    .nodes(NodesCharacteristics[0])
-    .links(NodesCharacteristics[1])
+  pathPathView = biHiSankeyPathView.link().curvature(0.45);
+  biHiSankeyPathView
+    .nodes(NodesCharacteristicsForPathView[0])
+    .links(NodesCharacteristicsForPathView[1])
     //.nodes([{"Application" : "Picasso", "name": "First node", "type" : "Elémentaire", "id" : "1", "originid" : "1"}, {"Application" : "Fermat", "name": "Second node", "type" : "Calculée", "id" : "2", "originid" : "2"}, {"Application" : "Fermat", "name": "Third node", "type": "Calculée", "id" : "3", "originid" : "3"}])
     //.links([{"source": "1", "target": "2", "value": "1", "type": "type1"}, {"source": "2", "target" : "3", "value" : "1", "type": "type2"}])
     .initializeNodes(function (node) {

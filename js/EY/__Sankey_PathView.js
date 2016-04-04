@@ -14,8 +14,8 @@ d3.Sankey_PathView = function () {
     parentNodes = [],
     leafNodes = [],
     links = [],
-    xScaleFactor = 1,
-    yScaleFactor = 1,
+    xScaleFactor = 0.5,
+    yScaleFactor = 0.5,
     defaultLinkCurvature = 0.5,
     informationSystems;
 
@@ -425,9 +425,15 @@ d3.Sankey_PathView = function () {
 
     function calculateLinkThickness() {
       links.forEach(function (link) {
-        link.thickness = link.value * yScaleFactor;
+        //link.thickness = link.value * yScaleFactor;
+        if (link.controlnature == 1){
+          link.thickness = 10;
+        }
+        else{
+          link.thickness = 3;
+        }
       });
-    }
+    } 
 
     function relaxLeftToRight(alpha) {
       function weightedSource(link) {

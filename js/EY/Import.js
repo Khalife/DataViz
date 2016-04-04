@@ -1,5 +1,6 @@
 ﻿// JS File used to build vizualisation data using Graph structure (nodes and links)
-var NodesAndLinks;
+var NodesAndLinksForAppView;
+var NodesAndLinksForPathView;
 var dataNames = [];
 var begin = 11;
 var end = 58;
@@ -70,8 +71,25 @@ function buildVizData(worksheet, numberOfLineBeginning, numberOfLineEnding){
   for (var i = numberOfLineBeginning; i != numberOfLineEnding; i++){
       if (worksheet["C" + i.toString()]){
         // var tabFields = ["originid", "present","next", "nextIS","previous","informationsystem", "controlquality", "informationtype", "etape"];
-        var tabFields = ["output", "outputId", "presentId", "present", "nextId", "next", "nextIS","previous","informationsystem", "controlquality", "informationtype", "etape", "equipe", "responsable", "contrôle"];
-        var tabFieldsColumnLocation = ["A", "B", "D", "C", "AC", "AB", "AD","AF", "Q", "AJ", "F", "P", "S", "T", "Z"];
+        var tabFields = [
+          "output",
+          "outputId",
+          "presentId",
+          "present",
+          "nextId",
+          "next",
+          "nextIS",
+          "previous",
+          "informationsystem",
+          "istransformed",
+          "controlnature",
+          "controlquality",
+          "informationtype",
+          "etape",
+          "equipe",
+          "responsable"
+        ];
+        var tabFieldsColumnLocation = ["A", "B", "D", "C", "AC", "AB", "AD","AF", "Q", "X", "Z", "AJ", "F", "P", "S", "T"];
 
         var result = {
           "type": 'Global',
@@ -103,8 +121,42 @@ function getIdFromName(array, name){
 
 function getControlQuality(text){
   // Get control quality based on text
-  // 1 is automatic, 2 semi automatic and 3 manual
-  return 2; // To be modified
+  // 1 is OK, 2 is KO and 3 is NO (not performed) - 4 is NA (not available)
+  switch(text) {
+    case "OK":
+        return 1;
+        break;
+    case "KO":
+        return 2;
+        break;
+    case "NO":
+        return 3;
+        break;
+    default: // "NA"
+        return 4;
+  }
+}
+
+function getControlNature(text){
+  // Get control nature based on text
+  // 1 is Automatique, 2 is Manuel and 3 is Semi-Automatique
+  switch(text) {
+    case "Automatique":
+        return 1;
+        break;
+    case "Manuel":
+        return 2;
+        break;
+    case "Semi-automatique":
+        return 3;
+        break;
+    default: // "NA"
+        return 2;
+  }
+}
+
+function getIsTransformed(text){
+  return (text == "Y");
 }
 
 function replaceISname(text){
@@ -162,7 +214,9 @@ function createPathNodesAndLinksFromData(data){
       "nextIS": replaceISname(data[i]["nextIS"]) || "output",
       "code": "",
       "informationsystem": replaceISname(data[i]["informationsystem"]),
+      "istransformed": getIsTransformed(data[i]["istransformed"]),
       "informationtype" : data[i]["informationtype"],
+      "controlnature" : getControlNature(data[i]["controlnature"]),
       "controlquality" : getControlQuality(data[i]["controlquality"]),
       "etape" : data[i]["etape"],
       "equipe" : data[i]["equipe"],
@@ -181,7 +235,9 @@ function createPathNodesAndLinksFromData(data){
     "nextIS": "",
     "code": "",
     "informationsystem": "output",
+    "istransformed": "",
     "informationtype" : "",
+    "controlnature" : "",
     "controlquality" : "",
     "etape" : "",
     "equipe" : "",
@@ -191,7 +247,12 @@ function createPathNodesAndLinksFromData(data){
   Nodes.push(outputNode);
 
   var result = [Nodes, Links];
-  NodesAndLinks = result;
+  NodesAndLinksForAppView = result;
+  NodesAndLinksForPathView = result;
+
+  // AUTO LAUNCH - test
+  launchDataVizModuleForAppView();
+  launchDataVizModuleForPathView();
 
 }
 

@@ -2,6 +2,8 @@
 // For applicative view : information systems and variables
 // For path view : variables and path representing flow of dependencies
 
+var LEGEND_X_ANCHOR = 900;
+var LEGEND_Y_ANCHOR = -20;
 
 function getISById(Nodes, id){
   // Function returning node information system from id given as argument
@@ -78,26 +80,52 @@ function getSegmentedPosition(i, nbNodes, Width){
   return position;
 }
 
-function getLinkTypeFromVariables(informationSystem, Nodes){
-  // Reminder : type of verifications varies in {1, 2, 3} 
-  // 1 defines automatic link, 2 semi automatic, and 3 manual
-  var moyenneTypeLink = 0;
+function getAggregateControlNature(informationSystem, Nodes){
+  // // Reminder : control nature varies in {1, 2, 3} 
+  // TODO: define an aggregation rule, here average is rounded and returned
+  // debugger;
+  var aggrControlNature = 0;
   var nbNodesContained = 0;
   for (var n of Nodes){
     if ( n["informationsystem"] == informationSystem ) {
       nbNodesContained = nbNodesContained + 1;
-      moyenneTypeLink = moyenneTypeLink + n["controlquality"];
+      aggrControlNature = aggrControlNature + n["controlnature"];
     }
   }
 
   if ( nbNodesContained == 0 ){
-    console.log("Warning : Information system without variable");
+    // console.log("Warning : Information system without variable");
     return 2;
   } 
 
   else{
-    moyenneTypeLink = moyenneTypeLink / Math.max(nbNodesContained,1);
-    return Math.trunc(moyenneTypeLink); 
+    aggrControlNature = aggrControlNature / Math.max(nbNodesContained,1);
+    return Math.round(aggrControlNature); 
+  }
+
+}
+
+function getAggregateControlQuality(informationSystem, Nodes){
+  // // Reminder : control quality varies in {1, 2, 3, 4} 
+  // TODO: define an aggregation rule, here average is rounded and returned
+  // debugger;
+  var aggrControlQuality = 0;
+  var nbNodesContained = 0;
+  for (var n of Nodes){
+    if ( n["informationsystem"] == informationSystem ) {
+      nbNodesContained = nbNodesContained + 1;
+      aggrControlQuality = aggrControlQuality + n["controlquality"];
+    }
+  }
+
+  if ( nbNodesContained == 0 ){
+    //console.log("Warning : Information system without variable");
+    return 2;
+  } 
+
+  else{
+    aggrControlQuality = aggrControlQuality / Math.max(nbNodesContained,1);
+    return Math.round(aggrControlQuality); 
   }
 
 }
@@ -200,37 +228,33 @@ function applicativeViewTransform(Nodes, Links, vizData){
   ////////////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////////////
   // Creating Links between apps using new nodes
-  for (var i = 0; i!= Links.length; i++){
-    if ( getISById(Nodes, Links[i].source) != getISById(Nodes, Links[i].target) ){
-      sourceInformationSystem = vizData.informationSystems.indexOf(getISById(Nodes, Links[i].source));
-      targetInformationSystem = vizData.informationSystems.indexOf(getISById(Nodes, Links[i].target));
-      // if ( sourceInformationSystem == -1 || targetInformationSystem == - 1 ){ debugger;}
+  for (var i = 0; i < NewNodes.length - 1; i++){
       NewLinks.push({
-        "source" : sourceInformationSystem,
-        "target" : targetInformationSystem,
-        "value": 1,
-        "type" : getLinkTypeFromVariables(vizData.informationSystems[sourceInformationSystem], Nodes),
+        "source" : NewNodes[i]["id"],
+        "target" : NewNodes[i+1]["id"],
+        "value": NewNodes[i],
+        "controlnature" : getAggregateControlNature(NewNodes[i]["name"], Nodes),
+        "controlquality" : getAggregateControlQuality(NewNodes[i]["name"], Nodes),
         "view" : "app"
       });
-    }
   }
   ////////////////////////////////////////////////////////////////////////////////////////
   // Check the list of information systems. If the link has not been made, create it
-  var target;
-  var source;
-  var checkLink;
-  for (var i = 0; i < nbInformationSystems - 1; i++){
-    checkLink = checkLinkExistence(NewLinks, i, i+1);
-    if ( ! checkLink ){
-      NewLinks.push({
-        "source" : i,
-        "target" : i+1,
-        "value" : 1,
-        "type" : 5, // information system that is not source of a movement to another information system
-        "view" : "app"
-      })
-    }
-  }
+  // var target;
+  // var source;
+  // var checkLink;
+  // for (var i = 0; i < nbInformationSystems - 1; i++){
+  //   checkLink = checkLinkExistence(NewLinks, i, i+1);
+  //   if ( ! checkLink ){
+  //     NewLinks.push({
+  //       "source" : i,
+  //       "target" : i+1,
+  //       "value" : 1,
+  //       "type" : 5, // information system that is not source of a movement to another information system
+  //       "view" : "app"
+  //     })
+  //   }
+  // }
   ///////////////////////////////////////////////////////////////////////////////////////
   ///////////////////////////////////////////////////////////////////////////////////////
 
@@ -243,6 +267,7 @@ function applicativeViewTransform(Nodes, Links, vizData){
     NewNodes.push({
       "type": "variable",
       "iscalculated" : iscalculated,
+      // "istransformed" : Nodes[i].istransformed,
       "id": lengthWithoutVariables + i,
       "name" : Nodes[i].name,
       "x" : 0,
@@ -260,6 +285,7 @@ function applicativeViewTransform(Nodes, Links, vizData){
     NewLinks.push({
       "source" : lengthWithoutVariables + i,
       "target" : vizData.informationSystems.indexOf(informationsystem),
+      "istransformed" : Nodes[i]["istransformed"],
       "value" : 1,
       "type" : 1,
       "view" : "app"
@@ -269,20 +295,18 @@ function applicativeViewTransform(Nodes, Links, vizData){
   
   /////////////////// Creating legend data /////////////////////////////////////////////
   // Include : elementary variable, calculated variable, information systems and links
-  var nbLegendNodes = 5;
-  var nbLegendLinks = 4;
-  var legendNodeText = ["Variable élémentaire", "Variable calculée", "Système d'information de collecte", "Système d'information d'aggrégation", "Système d'information de restitution"];
-  var legendLinkText = ["Appartenance variable à un système d'information", "Variable n'impliquant pas de déplacement", "Vérification automatique", "Vérification semi-automatique", "Vérification manuelle"];
+  var legendNodeText = ["Variable élémentaire", "Variable calculée", "SI de collecte", "SI d'aggrégation", "SI de restitution"];
+  var legendLinkText = ["Vérification automatique", "Vérification semi-automatique", "Vérification manuelle", "Appartenance variable à un SI", "Variable n'impliquant pas de déplacement"];
+   var nbLegendNodes = legendNodeText.length;
+  var nbLegendLinks = legendLinkText.length; 
   var legendData = [];
   var legendPositions = [];
-  var nodeWidth = 36;
-  var legendXStart = 1000;
-  var legendYStart = 600;
+  var nodeWidth = 27;
   for (var i = 0; i < nbLegendNodes + nbLegendLinks; i++){
-    var xMargin = 0, yMargin = 5;
+    var xMargin = 0, yMargin = 0;
     if ( i <= 1 ){ xMargin = nodeWidth/2;}
     //if ( i <= 2 ){ yMargin = 45;}
-    legendPositions.push([ legendXStart + xMargin, legendYStart + i*(nodeWidth + yMargin)]);
+    legendPositions.push([ LEGEND_X_ANCHOR + xMargin, LEGEND_Y_ANCHOR + i*(nodeWidth + yMargin)]);
   }
 
   for (var i = 0; i < nbLegendNodes; i++){
@@ -295,23 +319,20 @@ function applicativeViewTransform(Nodes, Links, vizData){
     })
 
   }
-  var nbLegendLinks = 5;
   for (var i = 0; i < nbLegendLinks; i++){
     legendData.push({
       "type" : "link",
       "id" : i + nbLegendNodes,
       "text" : legendLinkText[i],
-      "x" : legendPositions[i][0],
-      "y" : legendPositions[i][1],
+      "x" : legendPositions[i+nbLegendNodes][0],
+      "y" : legendPositions[i+nbLegendNodes][1],
     })
   }
 
   //legendData.push({"nodeLegendWidth" : , "rectangleLegendWidth" : });
   //////////////////////////////////////////////////////////////////////////////////////
-  NodesAndLinks[0] = NewNodes;
-  NodesAndLinks[1] = unique(NewLinks, compareLinkObjects, vizData.nbMaximumNodes);
-
-  return [NodesAndLinks[0], NodesAndLinks[1], legendData];
+  var returnLinks = unique(NewLinks, compareLinkObjects, vizData.nbMaximumNodes);
+  return [NewNodes, returnLinks, legendData];
 }
 
 // function getAllLinksWithNames(nameNode, NewNodes, Links){
@@ -328,6 +349,29 @@ function applicativeViewTransform(Nodes, Links, vizData){
 // }
 
 function pathViewTransform(Nodes, Links, vizData){
+  ////////////////////////////////////////////////////////////////////////////////////////
+  // Aim : Creating an array containing the ISs (information systems) ordered, where each previous pours in the following
+  // 1 : create liste (source, target) without double
+  var informationSystemsDoublon = [];
+  for (var i = 0; i!= Nodes.length; i++){
+    if ( Nodes[i]["informationsystem"] != Nodes[i]["nextIS"] ){ // under the condition of different source and target
+      informationSystemsDoublon.push([Nodes[i]["informationsystem"], Nodes[i]["nextIS"]]);
+    }
+  }
+  informationSystemsDoublon = informationSystemsDoublon.getUnique()
+
+  var indexWell;
+  // 2 : Build target of the ordered list
+  for (var i = 0; i != informationSystemsDoublon.length; i++){
+    if ( informationSystemsDoublon[i][1] == "") { indexWell = i};
+  }
+  // 3 : Unroll information systems dumping
+  vizData.informationSystems = [];
+  while (  indexWell > -1 ){
+    vizData.informationSystems.unshift(informationSystemsDoublon[indexWell][0]);
+    indexWell = indexOfSourceAsTarget(informationSystemsDoublon, indexWell);
+  }
+
   ////////////////////////////////////////////////////////////////////////////////////////
   //////////////////// Creating nodes containing variables   ///////////////////////////////
   var NewNodes = [];
@@ -352,34 +396,15 @@ function pathViewTransform(Nodes, Links, vizData){
     var NodeSource = getNodeFromId(NewNodes, sourceVariable);
     var NodeTarget = getNodeFromId(NewNodes, targetVariable);
     var typeOfLink = NodeSource["controlquality"];
+    var sourceInformationSystem = vizData.informationSystems.indexOf(NodeSource.informationsystem); 
     Links[i]["type"] = typeOfLink;
     Links[i]["view"] = "path";
     Links[i]["source"] = NodeSource;
     Links[i]["target"] = NodeTarget; 
+    Links[i]["controlnature"] = getAggregateControlNature(vizData.informationSystems[sourceInformationSystem], Nodes);
+    Links[i]["controlquality"] = getAggregateControlQuality(vizData.informationSystems[sourceInformationSystem], Nodes);
     // Links[i]["name"] = NodeSource["name"]
     // Links[i]["id"] = getNodeFromId(Nodes, Links[i]["id"] );
-  }
-
-  // Aim : Creating an array containing the ISs (information systems) ordered, where each previous pours in the following
-  // 1 : create liste (source, target) without double
-  var informationSystemsDoublon = [];
-  for (var i = 0; i!= Nodes.length; i++){
-    if ( Nodes[i]["informationsystem"] != Nodes[i]["nextIS"] ){ // under the condition of different source and target
-      informationSystemsDoublon.push([Nodes[i]["informationsystem"], Nodes[i]["nextIS"]]);
-    }
-  }
-  informationSystemsDoublon = informationSystemsDoublon.getUnique()
-
-  var indexWell;
-  // 2 : Build target of the ordered list
-  for (var i = 0; i != informationSystemsDoublon.length; i++){
-    if ( informationSystemsDoublon[i][1] == "") { indexWell = i};
-  }
-  // 3 : Unroll information systems dumping
-  vizData.informationSystems = [];
-  while (  indexWell > -1 ){
-    vizData.informationSystems.unshift(informationSystemsDoublon[indexWell][0]);
-    indexWell = indexOfSourceAsTarget(informationSystemsDoublon, indexWell);
   }
 
   ////////////////////////////////////////////////////////////////////////////////////////
@@ -390,5 +415,6 @@ function pathViewTransform(Nodes, Links, vizData){
   ////////////////////////////////////////////////////////////////////////////////////////
   // return [NewNodes, Links, legendData];
   return [NewNodes, Links, legendData];
+
 
 }

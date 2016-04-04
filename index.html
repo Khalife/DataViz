@@ -3,21 +3,81 @@
   <head>
     <title>EY FSO DnA DataViz prototype</title>
     <!-- Stlesheet -->
+    <link href="css/normalize.css" rel="stylesheet">
     <link href="css/style.css" rel="stylesheet">
   </head>
   <body>
-    <!-- File picker -->
-    <input type="file" id="files" name="files[]"/>
-    <!-- Dataviz startup buttons -->
-    <button id= "launchOnClickAppView" type="button" onclick="launchDataVizModuleForAppView()">Applicative View</button>
-    <button id= "launchOnClickPathView" type="button" onclick="launchDataVizModuleForPathView()">Path View</button>
-    <output id="output"></output>
-    <!-- Dataviz wrapper -->
-    <div id="chart"></div>
+
+<!-- Page contents -->
+
+    <!-- Logo -->
+    <img src="http://ey-home.ey.net/wps/themes/html/EYGlobalWeb2/EYlogo.png">
+    <!-- Main content -->
+    <section class="content bgcolor">
+        <!-- File picker -->
+        <input type="file" name="files[]" id="files" class="inputfile inputfile-4"/>
+        <label for="files">
+            <figure>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="17" viewBox="0 0 20 17">
+                    <path d="M10 0l-5.2 4.9h3.3v5.1h3.8v-5.1h3.3l-5.2-4.9zm9.3 11.5l-3.2-2.1h-2l3.4 2.6h-3.5c-.1 0-.2.1-.2.1l-.8 2.3h-6l-.8-2.2c-.1-.1-.1-.2-.2-.2h-3.6l3.4-2.6h-2l-3.2 2.1c-.4.3-.7 1-.6 1.5l.6 3.1c.1.5.7.9 1.2.9h16.3c.6 0 1.1-.4 1.3-.9l.6-3.1c.1-.5-.2-1.2-.7-1.5z"/>
+                </svg>
+            </figure>
+            <span>Choisir les donn&eacute;es&hellip;</span>
+        </label>
+        <!-- Dataviz startup buttons -->
+        <!-- <button id= "launchOnClickAppView" type="button" onclick="launchDataVizModuleForAppView()">Applicative View</button> -->
+        <!-- <button id= "launchOnClickPathView" type="button" onclick="launchDataVizModuleForPathView()">Path View</button> -->
+        <output id="output"></output>
+        <br /><br />
+        <!-- Tabs -->
+        <svg class="hidden">
+            <defs>
+                <path id="tabshape" d="M80,60C34,53.5,64.417,0,0,0v60H80z"/>
+            </defs>
+        </svg>
+        <div class="container">
+            <section>
+                <div class="tabs tabs-style-shape">
+                    <nav>
+                        <ul>
+                            <li>
+                                <a href="#section-shape-1">
+                                    <svg viewBox="0 0 80 60" preserveAspectRatio="none"><use xlink:href="#tabshape"></use></svg>
+                                    <span>Vision applicative</span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#section-shape-2">
+                                    <svg viewBox="0 0 80 60" preserveAspectRatio="none"><use xlink:href="#tabshape"></use></svg>
+                                    <span>Vision cheminement</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                    <div class="content-wrap">
+                        <section id="section-shape-1">
+                            <!-- Dataviz wrapper - applicative view -->
+                            <div id="chart-applicative"></div>
+
+                        </section>
+                        <section id="section-shape-2">
+                            <!-- Dataviz wrapper - applicative view -->
+                            <div id="chart-path"></div>
+                        </section>
+                    </div><!-- /content -->
+                </div><!-- /tabs -->
+            </section>
+        </div><!-- /container -->
+    </section>
+    <p>&copy; EY FSO 2016 (<a href="mailto:jonathan.horyn@fr.ey.com?subject=Question Natixis DataViz">des questions ?</a>)</p>
+
+<!-- Scripts -->
+
     <!-- 3rd party libs untouched by EY -->
     <script src="http://d3js.org/d3.v3.min.js"></script>
     <script src="https://code.jquery.com/jquery-1.12.1.min.js"></script>
     <script src="https://cdn.rawgit.com/SheetJS/js-xlsx/master/dist/xlsx.core.min.js"></script>
+    <script src="js/lib/cbpFWTabs.js"></script>
     <!-- 3rd party libs modified by EY -->
     <script src="js/EY/__Sankey_AppView.js"></script>
     <script src="js/EY/__Sankey_PathView.js"></script>
@@ -27,6 +87,10 @@
     <script src="js/EY/Transform.js"></script>
     <!-- EY dataviz wrapper - data visualization based on FS Risk team specs -->
     <script src="js/EY/Visualization.js"></script>
+    <!-- Utility scripts (mostly style-related) -->
+    <script>(function(){[].slice.call(document.querySelectorAll('.tabs')).forEach(function(el){new CBPFWTabs(el);});})();</script>
+    <script>(function(e,t,n){var r=e.querySelectorAll("html")[0];r.className=r.className.replace(/(^|\s)no-js(\s|$)/,"$1js$2")})(document,window,0);</script>
+    <script src="js/lib/customFileInput.js"></script>
 
   </body>
 </html>

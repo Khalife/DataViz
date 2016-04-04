@@ -1,7 +1,7 @@
 ﻿// Forked from Neilos - 2015 (Github)
 // A d3 javascript library/plugin for drawing bi-directional hierarchical sankey diagrams
-var WIDTH = 940;
-var HEIGHT = 934;
+// var WIDTH = 940;
+// var HEIGHT = 934;
 
 d3.Sankey_AppView = function () {
   "use strict";
@@ -9,8 +9,8 @@ d3.Sankey_AppView = function () {
   var biHiSankey = {},
     nodeWidth = 24,
     nodeHeight = 40,
-    informationSystemNodeWidth = 150,
-    informationSystemNodeHeigth = 75,
+    informationSystemNodeWidth = 80,
+    informationSystemNodeHeigth = 40,
     nodeSpacing = 8,
     linkSpacing = 5,
     arrowheadScaleFactor = 0, // Specifies the proportion of a link's stroke width to be allowed for the marker at the end of the link.
@@ -24,7 +24,13 @@ d3.Sankey_AppView = function () {
     yScaleFactor = 1,
     defaultLinkCurvature = 1,
     //WIDTH = 940;
-    WIDTH = 1480,
+    // WIDTH = 1480,
+    WIDTH = 1100,
+    VERTICAL_OFFSET = 380,
+    HORIZONTAL_OFFSET = 0,
+    VERTICAL_ISNODE_INCREMENT = 20,
+    VERTICAL_ISNODE_INCREMENT_FACTOR = 40,
+    VERTICAL_NODE_INCREMENT_FACTOR = 2,
     informationSystems,
     legendData;
 
@@ -108,7 +114,6 @@ d3.Sankey_AppView = function () {
       link.id = link.source + '-' + link.target;
       link.source = sourceNode;
       link.target = targetNode;
-      console.log(link.id + "/" + link.source.name + "/" + link.target.name); 
       sourceNode.sourceLinks.push(link);
       targetNode.targetLinks.push(link);
     });
@@ -338,7 +343,7 @@ d3.Sankey_AppView = function () {
     var nbIsNodes = nodes.filter(function(d){ if (d.type  == "informationsystem") { return true; } }).length;
     var X_IS = [], incrementalX = WIDTH / (nbIsNodes + 1);
     var incrementalXIndex = 1, i = 0;
-    nodes.filter(function (d){ if (d.type  == "informationsystem") { return true; } }).forEach( function (d) { X_IS.push(incrementalXIndex*incrementalX); incrementalXIndex = incrementalXIndex + 1;} );
+    nodes.filter(function (d){ if (d.type  == "informationsystem") { return true; } }).forEach( function (d) { X_IS.push(incrementalXIndex*incrementalX - HORIZONTAL_OFFSET); incrementalXIndex = incrementalXIndex + 1;} );
     var remainingNodes = nodes.filter(function (d){ if (d.type  == "informationsystem") { return true; } }),
         nextNodes,
         x = X_IS[0],
@@ -458,12 +463,12 @@ d3.Sankey_AppView = function () {
     }
 
     function initializeNodeYPosition() {
-      nodes.filter(function (d){ if (d.type === "informationsystem" ) { return true;} }).forEach(function (node, i){ node.y = 20 + 30*i;});
+      nodes.filter(function (d){ if (d.type === "informationsystem" ) { return true;} }).forEach(function (node, i){ node.y = VERTICAL_ISNODE_INCREMENT + VERTICAL_ISNODE_INCREMENT_FACTOR*i;});
       var nbVariablesIS;
       for (var i = 0; i < informationSystems.length; i++){
         var concernedVariables = nodes.filter(function (d){ if (  d.type === "variable"   ) { return true;} }).filter(function (d){ if (  d.informationsystem === informationSystems[i] ) { return true;} });
         nbVariablesIS = concernedVariables.length;
-        concernedVariables.forEach(function (node){ node.y = 350 + nbVariablesIS*nodeWidth*Math.random();});
+        concernedVariables.forEach(function (node, index){ node.y = VERTICAL_OFFSET + nbVariablesIS*nodeWidth*(index/VERTICAL_NODE_INCREMENT_FACTOR);});
       }
       // // nodes.filter(function (d){ if (d.type === "variable" ) { return true;} }).forEach(function (node){  node.y = 400 + 200*Math.random();});
       
@@ -478,11 +483,20 @@ d3.Sankey_AppView = function () {
     function calculateLinkThickness() {
       links.forEach(function (link) {
         //link.thickness = link.value * yScaleFactor;
-        if (link.source.type == "informationsystem"){
+        if (link.source.type == "informationsystem" && link.controlnature == 1){
           link.thickness = 10;
         }
         else{
-          link.thickness = 5;
+          link.thickness = 3;
+        }
+      });
+    }
+
+    function calculateLinkDash() {
+      links.forEach(function (link) {
+        //link.thickness = link.value * yScaleFactor;
+        if (link.source.type == "informationsystem" && link.controlnature == 3){
+          link.dash = "10,10";
         }
       });
     }
@@ -563,6 +577,7 @@ d3.Sankey_AppView = function () {
     //calculateYScaleFactor();
     initializeNodeYPosition();
     calculateLinkThickness();
+    calculateLinkDash();
     //resolveCollisions();
 
     // for (alpha = 1; iterations > 0; --iterations) {
@@ -698,33 +713,6 @@ d3.Sankey_AppView = function () {
            + "L" + (x4 + straightSectionLength) + "," + y1;
     }
 
-
-    function leftToRightLinkVariables(link) {
-      // The link is necessarily a link between information systems
-      // We suppose there is only one connection . 
-      var arrowHeadLength = link.thickness * arrowheadScaleFactor,
-          straightSectionLength = (3 * link.thickness / 4) - arrowHeadLength,
-          // Version where links are connected to the side of the node
-          x0 = link.source.x + link.source.width,
-          x1 = x0 + arrowHeadLength / 2,
-          x4 = link.target.x - link.target.width,// - straightSectionLength - arrowHeadLength,
-          xi = d3.interpolateNumber(x0, x4),
-          x2 = xi(curvature),
-          x3 = xi(1 - curvature),
-          // y0 = link.source.y + link.sourceY + link.thickness / 2,
-          y0 = link.source.y,  // + link.source.height / 2,
-          // y1 = link.target.y + link.targetY + link.thickness / 2;
-          y1 = link.target.y; // + link.target.height / 2;
-
-      return "M" + x0 + "," + y0
-           + "L" + x1 + "," + y0
-           + "C" + x2 + "," + y0
-           + " " + x3 + "," + y1
-           + " " + x4 + "," + y1
-           + "L" + (x4 + straightSectionLength) + "," + y1;
-    }
-
-
     function rightToLeftLink(link) {
       // The link is necessarily a link between information systems
       var arrowHeadLength = link.thickness * arrowheadScaleFactor,
@@ -747,28 +735,6 @@ d3.Sankey_AppView = function () {
            + "L" + (x4 - straightSectionLength) + "," + y1;
     }
 
-    function rightToLeftLinkVariables(link){
-      var arrowHeadLength = link.thickness * arrowheadScaleFactor,
-          straightSectionLength = link.thickness / 4,
-      x0 = link.source.x - link.source.width ,
-      x1 = x0 - arrowHeadLength / 2,
-      x4 = link.target.x + link.target.width, //+ straightSectionLength + arrowHeadLength,
-      xi = d3.interpolateNumber(x0, x4),
-      x2 = xi(curvature),
-      x3 = xi(1 - curvature),
-      // y0 = link.source.y + link.sourceY + link.thickness / 2,
-      y0 = link.source.y, //+ link.source.height/ 2,
-      y1 = link.target.y; //+ link.target.height / 2;
-
-      return "M" + x0 + "," + y0
-      + "L" + x1 + "," + y0
-      + "C" + x2 + "," + y0
-      + " " + x3 + "," + y1
-      + " " + x4 + "," + y1
-      + "L" + (x4 - straightSectionLength) + "," + y1;
-
-    }
-
     function bottomToTop(link){
       // The link is necessarily a link between variables and information systems
       // Version where links are connected to the bottom or above the node
@@ -787,10 +753,10 @@ d3.Sankey_AppView = function () {
 
 
       return "M" + x0 + "," + y0
-           + "L" + x0 + "," + y1
-           + "C" + x0 + "," + y2
-           + " " + x1 + "," + y3
-           + " " + x1 + "," + y4
+           // + "L" + x0 + "," + y1
+           // + "C" + x0 + "," + y2
+           // + " " + x1 + "," + y3
+           // + " " + x1 + "," + y4
            + "L" + x1  + "," + y4;
     }
 
@@ -812,10 +778,10 @@ d3.Sankey_AppView = function () {
       x5 = x4;
 
       return "M" + x0 + "," + y0
-           + "L" + x1 + "," + y0
-           + "C" + x2 + "," + y0
-           + " " + x3 + "," + y1
-           + " " + x4 + "," + y1
+           // + "L" + x1 + "," + y0
+           // + "C" + x2 + "," + y0
+           // + " " + x3 + "," + y1
+           // + " " + x4 + "," + y1
            + "L" + x5  + "," + y2;
     }
 
@@ -851,26 +817,6 @@ d3.Sankey_AppView = function () {
             return rightToLeftLink(d);
         }
       }
-
-      if ( d.view == "path"){
-
-        if (d.type == 1){
-          // then link from variable to app
-          //if (d.source.y < d.target.y){
-          //  return headToBottom(d);
-          //}
-        return bottomToTop(d);
-        }
-
-        else{
-          if (d.source.x < d.target.x) {
-            return leftToRightLinkVariables(d);
-          }
-            return rightToLeftLinkVariables(d);
-        }
-
-      }
-
 
     }
 
