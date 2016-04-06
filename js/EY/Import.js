@@ -2,6 +2,7 @@
 var NodesAndLinksForAppView;
 var NodesAndLinksForPathView;
 var dataNames = [];
+// Limits of parsing (line numbers) :
 var begin = 11;
 var end = 58;
 
@@ -34,31 +35,6 @@ function stringSwitchUndefined(variable){
     return variable;
 }
 
-// 2 functions in case of replacing some character is needed
-// function spliceSlice(str, index, count, add) {
-//   return str.slice(0, index) + (add || "") + str.slice(index + count);
-// }
-
-// function avoidEncodingIssues(string, characterToBeReplaced){
-//   debugger;
-//   if ( string.indexOf("é") > -1 ){
-//     return spliceSlice(string, string.indexOf("é"), 1, "e");
-//   }
-// }
-
-// function elementaryParsing(worksheet){
-//   // Method parsing worksheet and building a JS array
-//   // Input : worksheet
-//   // Returns an array where i-th element is i-th variable
-//   //var dataNames = []
-//   for (var i = numberOfLineBeginning; i != numberOfLineEnding; i++){
-//     if ( worksheet["C" + i.toString()] != ""){
-//         dataNames.push(worksheet["C" + i.toString()]);
-//     }
-//   }
-//   return dataNames;
-// }
-
 function buildVizData(worksheet, numberOfLineBeginning, numberOfLineEnding){
   // Method parsing worksheet file and creatings NodesAndLinksData
   // Input : worksheet as a XLSX data structure (JS Package)
@@ -88,9 +64,10 @@ function buildVizData(worksheet, numberOfLineBeginning, numberOfLineEnding){
           "etape",
           "equipe",
           "responsable",
-          "table"
+          "table",
+          "champs"
         ];
-        var tabFieldsColumnLocation = ["A", "B", "D", "C", "AC", "AB", "AD","AF", "Q", "X", "Z", "AJ", "F", "P", "S", "T", "V"];
+        var tabFieldsColumnLocation = ["A", "B", "D", "C", "AC", "AB", "AD","AF", "Q", "X", "Z", "AJ", "F", "P", "S", "T", "V", "W"];
 
         var result = {
           "type": 'Global',
@@ -122,6 +99,7 @@ function getIdFromName(array, name){
 
 function getControlQuality(text){
   // Get control quality based on text
+  // To be modified depending on input data
   // 1 is OK, 2 is KO and 3 is NO (not performed) - 4 is NA (not available)
   switch(text) {
     case "OK":
@@ -136,10 +114,12 @@ function getControlQuality(text){
     default: // "NA"
         return 4;
   }
+  return text;
 }
 
 function getControlNature(text){
   // Get control nature based on text
+  // To be modified depending on input data
   // 1 is Automatique, 2 is Manuel and 3 is Semi-Automatique
   switch(text) {
     case "Automatique":
@@ -154,9 +134,12 @@ function getControlNature(text){
     default: // "NA"
         return 2;
   }
+  return text;
 }
 
 function getIsTransformed(text){
+  // Function to be modified depending on input data
+  // Transforms text data (affirmative or negative) into boolean
   return (text == "Y");
 }
 
@@ -222,7 +205,10 @@ function createPathNodesAndLinksFromData(data){
       "etape" : data[i]["etape"],
       "equipe" : data[i]["equipe"],
       "responsable" : data[i]["responsable"],
-      "table" : data[i]["table"]
+      "table" : data[i]["table"],
+      "champs" : data[i]["champs"],
+      "controlnaturetext" : data[i]["controlnature"],
+      "controlqualitytext" : data[i]["controlquality"]
       };
     Nodes.push(newNode);
   }
@@ -243,11 +229,10 @@ function createPathNodesAndLinksFromData(data){
     "controlquality" : "",
     "etape" : "",
     "equipe" : "",
-    "responsable" : ""
+    "responsable" : "",
+    "champs" : ""
   }
-
   Nodes.push(outputNode);
-
   var result = [Nodes, Links];
   // debugger;
   NodesAndLinksForAppView = result;
@@ -259,27 +244,10 @@ function createPathNodesAndLinksFromData(data){
 
 }
 
-
-function unique(a) {
-    // Function droping duplicates inside array a
-    var seen = {};
-    return a.filter(function(item) {
-        return seen.hasOwnProperty(item) ? false : (seen[item] = true);
-    });
-}
-
 function handleFileSelect(evt) {
   // Function creating a HTML Button on document
   var files = evt.target.files; // FileList object
   // files is a FileList of File objects. List some properties.
-  // var output = [];
-  // for (var i = 0, f; f = files[i]; i++) {
-  //   output.push('<li><strong>', escape(f.name), '</strong> (', f.type || 'n/a', ') - ',
-  //               f.size, ' bytes, last modified: ',
-  //               f.lastModifiedDate ? f.lastModifiedDate.toLocaleDateString() : 'n/a',
-  //               '</li>');
-  // }
-  //document.getElementById('output').innerHTML = '<ul>' + output.join('') + '</ul>';
   getWorksheetFromFile(files[0]);
 }
 

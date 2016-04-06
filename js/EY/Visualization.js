@@ -90,10 +90,10 @@ hideAppLinkTooltip = function () {
     .style("opacity", 0);
 },
 
-showAppLinkTooltip = function () {
+showAppLinkTooltip = function (s, t) {
   return tooltipAppView
-    .style("left", d3.event.pageX + "px")
-    .style("top", d3.event.pageY + 15 + "px")
+    .style("left", 0.5*(s.x + t.x) + "px")
+    .style("top", 0.5*(s.y + t.y) + 15 + "px")
     .transition()
       .duration(TRANSITION_DURATION)
       .style("opacity", 1);
@@ -112,7 +112,23 @@ showPathTooltip = function () {
     .transition()
       .duration(TRANSITION_DURATION)
       .style("opacity", 1);
+},
+
+hidePathLinkToolTip = function(){
+  return tooltipPathView.transition()
+  .duration(TRANSITION_DURATION)
+  .style("opacity", 0);
+},
+
+showPathLinkTooltip = function (s, t) {
+  return tooltipPathView
+    .style("left", 0.5*(s.x + t.x) + "px")
+    .style("top", 0.5*(s.y + t.y) + 15 + "px")
+    .transition()
+      .duration(TRANSITION_DURATION)
+      .style("opacity", 1);
 };
+
 
 function howHideAppChildren(node) {
   disableUserInterractions(2 * TRANSITION_DURATION);
@@ -257,7 +273,7 @@ svgPathView.append("g").attr("id", "legend");
 
 tooltipPathView = d3.select("#chart-path").append("div").attr("id", "tooltipPathView");
 
-tooltipAppView.style("opacity", 0)
+tooltipPathView.style("opacity", 0)
     .append("p")
       .attr("class", "value");
 
@@ -622,13 +638,11 @@ function updateAppView () {
 
   linkBetweenApps.on('mouseenter', function (d) {
     if (!isTransitioning) {
-      showAppLinkTooltip().select(".value").text(function () {
-        if (d.direction > 0) {
-          return d.source.name + " → " + d.target.name + "\n" + CONTROL_QUALITY[d.controlquality] + "\n" + d.transformedvariables + "\n" + CONTROL_NATURE[d.controlnature];
-
-        }
-        return d.target.name + " ← " + d.source.name + "\n" + CONTROL_QUALITY[d.controlquality] + "\n" + d.transformedvariables+ "\n" + CONTROL_NATURE[d.controlnature];
-      });
+      showAppLinkTooltip(d.source, d.target).select(".value")
+        .text(function () {
+         // showAppTooltip().select("value").text(function() {
+          return "Flux: \n" + d.source.name + " → " + d.target.name + "\n \n " + "Table : \n " + d.table + "\n \n " + "Champs du flux : \n " + d.champs + "\n \n" + "Variables transformées :\n"+ d.transformedvariables;
+        });
     }
   });
 
@@ -650,10 +664,10 @@ function updateAppView () {
           .style("opacity", 1).select(".value")
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            var reverseControlQuality = CONTROL_QUALITY[g.controlquality - 1];
-            var reverseControlNature = CONTROL_NATURE[g.controlnature - 1]; 
-            debugger;
-            return g.table + "\n" + "SI " + g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
+            var reverseControlQuality = g.controlqualitytext;
+            var reverseControlNature = g.controlnaturetext; 
+            // return g.table + "\n" + "SI " + g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
+            return "Table : \n" + g.table + "\n \n" + "Champs : \n" + g.champs + "\n \n" + "Contrôle effectué : \n" + reverseControlQuality + "\n \n" +"Nature du contrôle : \n" + reverseControlNature; 
           });
     }
   });
@@ -670,9 +684,10 @@ function updateAppView () {
           .style("opacity", 1).select(".value")
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            var reverseControlQuality = CONTROL_QUALITY[g.controlquality - 1];
-            var reverseControlNature = CONTROL_NATURE[g.controlnature - 1]; 
-            return g.table + "\n" + "SI " +  g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
+            var reverseControlQuality = g.controlqualitytext;
+            var reverseControlNature = g.controlnaturetext; 
+            // return g.table + "\n" + "SI " +  g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
+            return "Table : \n" + g.table + "\n \n" + "Champs : \n" + g.champs + "\n \n" + "Contrôle effectué : \n" + reverseControlQuality + "\n \n" + "Nature du contrôle : \n" + reverseControlNature; 
           });
     }
   });
@@ -689,10 +704,11 @@ function updateAppView () {
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
             // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
-            return g.equipe + "\n" + g.responsable ;
+            return "Equipe :\n" + g.equipe + "\n \n" + "Responsable : \n" + g.responsable ;
           });
     }
   });
+
 
   node.on("mouseleave", function () {
     if (!isTransitioning) {
@@ -981,6 +997,8 @@ function updateAppView () {
       qualityNOLinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 3);}),
       qualityNALinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 4);});
 
+
+  // qualityOKLinks.select("polygon").style("fill", d3.rgb(LINKS_COLORS[3]));
   function restoreVariableNode(type){
     switch (type) {
       case "Variable élémentaire":
@@ -1216,8 +1234,8 @@ function updatePathView(){
     node.y = Math.max(0, Math.min(HEIGHT - node.height, d3.event.y));
     d3.select(this).attr("transform", "translate(" + node.x + "," + node.y + ")");
     biHiSankeyPathView.relayout();
-    svgAppView.selectAll(".node").selectAll("rect").attr("height", function (d) { return d.height; });
-    link.attr("d", pathAppView);
+    svgPathView.selectAll(".node").selectAll("rect").attr("height", function (d) { return d.height; });
+    link.attr("d", pathPathView);
   }
 
   function containChildren(node) {
@@ -1466,10 +1484,9 @@ function updatePathView(){
           .style("opacity", 1).select(".value")
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            var reverseControlQuality = CONTROL_QUALITY[g.controlquality - 1];
-            var reverseControlNature = CONTROL_NATURE[g.controlnature - 1]; 
-            debugger;
-            return g.table + "\n" + "SI " + g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
+            var reverseControlQuality = g.controlquality;
+            var reverseControlNature = g.controlnature; 
+            return "Equipe : \n" + g.equipe + "\n \n" + "Etape : \n" + g.etape+ "\n";
           });
     }
   });
@@ -1485,13 +1502,39 @@ function updatePathView(){
           .duration(TRANSITION_DURATION)
           .style("opacity", 1).select(".value")
           .text(function () {
-            var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            var reverseControlQuality = CONTROL_QUALITY[g.controlquality - 1];
-            var reverseControlNature = CONTROL_NATURE[g.controlnature - 1]; 
-            return g.table + "\n" + "SI " +  g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
+            return "Equipe : \n" + g.equipe + "\n \n" + "Etape : \n" + g.etape+ "\n";
           });
     }
   });
+
+  link.on("mouseenter", function (g){
+    // if (!isTransitioning) {
+    //   showPathLinkTooltip(g.source, g.target).select("value").text(function () {
+    //         return "Flux : \n" + g.source.informationsystem  + "->" + g.target.informationsystem + "\n \n" + "Donnée dans le flux : \n" + g.source.name;
+    //       });      
+    // }
+    if (!isTransitioning) {
+      // highlightConnected(g);
+      // restoreLinksAndNodes();
+      tooltipPathView
+        .style("left", 0.5*(g.source.x + g.target.x) + MARGIN.LEFT + "px")
+        .style("top", 0.5*(g.source.y + g.target.y) + g.height + MARGIN.TOP + 15 + "px")
+        .transition()
+          .duration(TRANSITION_DURATION)
+          .style("opacity", 1).select(".value")
+          .text(function () {
+            return "Flux : \n" + g.source.informationsystem  + "->" + g.target.informationsystem + "\n \n" + "Donnée dans le flux : \n" + g.source.name;
+          });
+    }
+  });
+
+
+  link.on("mouseleave", function (g){
+    if (!isTransitioning){
+      hidePathLinkToolTip();
+      restoreLinksAndNodes();
+    }
+  })
 
   node.on("mouseleave", function () {
     if (!isTransitioning) {

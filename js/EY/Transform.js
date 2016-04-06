@@ -5,27 +5,6 @@
 var LEGEND_X_ANCHOR = 900;
 var LEGEND_Y_ANCHOR = -20;
 
-function getISById(Nodes, id){
-  // Function returning node information system from id given as argument
-  for (var n of Nodes){
-    if (n["id"] == id){
-      return n["informationsystem"];
-    }
-  }
-}
-
-function removeDuplicatesFromListOfObject(list){
-  // Input : list of objects
-  // n^2 complexity with respect to size of the list
-  var listOfIndexToKeep = [];
-  for (var i = 0; i < list.length; i++){
-    for (var j = 0; j < list.length; j++){
-      listOfIndexToKeep.push(list.indexOf({"source": i.toString(), "target": j.toString(), "value": 1}))
-      L.push();
-    }
-  }
-}
-
 function compareLinkObjects(object1, object2, nbMaximumNodes){
   try{
     var quantity1 = parseInt(object1.source)*nbMaximumNodes + parseInt(object1.target);
@@ -102,7 +81,6 @@ function getAggregateControlNature(informationSystem, Nodes){
     aggrControlNature = aggrControlNature / Math.max(nbNodesContained,1);
     return Math.round(aggrControlNature); 
   }
-
 }
 
 function getAggregateControlQuality(informationSystem, Nodes){
@@ -127,17 +105,58 @@ function getAggregateControlQuality(informationSystem, Nodes){
     aggrControlQuality = aggrControlQuality / Math.max(nbNodesContained,1);
     return Math.round(aggrControlQuality); 
   }
-
 }
 
-function checkLinkExistence(Links, source, target){
-  // Function checking if a link source -> target exists within the links
-  for (var l of Links){
-    if ( l.source == source && l.target == target ){
-      return true;
+function getAggregateControlNatureText(informationSystem, Nodes, controlQualities){
+  // // Reminder : control nature varies in {1, 2, 3} 
+  // TODO: define an aggregation rule, here average is rounded and returned
+  // debugger;
+  var aggrControlNature = 0;
+  var nbNodesContained = 0;
+  var averageIndex;
+  for (var n of Nodes){
+    if ( n["informationsystem"] == informationSystem ) {
+      nbNodesContained = nbNodesContained + 1;
+      aggrControlNature = aggrControlNature + controlQualities.indexOf(n["controlnature"]);
     }
   }
-  return false;
+
+  if ( nbNodesContained == 0 ){
+    // console.log("Warning : Information system without variable");
+    return controlQualities[Math.max(1, controlQualities.length)];
+  } 
+
+  else{
+    averageIndex = aggrControlNature / Math.max(nbNodesContained,1);
+    return controlQualities[Math.round(averageIndex)]; 
+  }
+}
+
+function getAggregateControlQualityText(informationSystem, Nodes, controlNatures){
+  // // Reminder : control quality varies in {1, 2, 3, 4} 
+  // TODO: define an aggregation rule, here average is rounded and returned
+  // debugger;
+  var aggrControlQuality = 0;
+  var nbNodesContained = 0;
+  var averageIndex;
+  for (var n of Nodes){
+    if ( n["informationsystem"] == informationSystem ) {
+      nbNodesContained = nbNodesContained + 1;
+      aggrControlQuality = aggrControlQuality + controlNatures.indexOf(n["controlquality"]);
+    }
+  }
+
+  if ( nbNodesContained == 0 ){
+    //console.log("Warning : Information system without variable");
+    return controleNatures[Math.max(1, controlNatures.length)];
+  } 
+
+  else{
+    averageIndex = aggrControlQuality / Math.max(nbNodesContained,1);
+    console.log(averageIndex);
+    console.log(controlNatures);
+    return controlNatures[Math.round(averageIndex)]; 
+  }
 }
 
 function indexOfSourceAsTarget(tab, indexSource){
@@ -163,19 +182,38 @@ function getNodeFromId(Nodes, index){
 
 function getTransformedNodesFromIS(Nodes, is){
   var listOfNodesNames = "";
+  var index= false;
   for (var n of Nodes){
-    if ( n.informationsystem == is){
-      if (n.transformed == true ){
-        listOfNodesNames = listOfNodesNames + "\n" + n.name;
-      }
+    if ( n.informationsystem == is && n.istransformed == true){
+        listOfNodesNames = listOfNodesNames + n.name + "\n";
     }
   }
   return listOfNodesNames;
 }
 
-function applicativeViewTransform(Nodes, Links, vizData){
+function getControlNaturesFromNodes(Nodes){
+  var controlNatureList = [];
+  for (var n of Nodes){
+    controlNatureList.push(n.controlnature);
+  }
+  controlNatureList = controlNatureList.getUnique();
+  return controlNatureList;
+}
 
+function getControlQualitiesFromNodes(Nodes){
+  var controlQualityList = [];
+  for (var n of Nodes){
+    controlQualityList.push(n.controlquality);
+  }
+  controlQualityList = controlQualityList.getUnique();
+  return controlQualityList;
+}
+
+function applicativeViewTransform(Nodes, Links, vizData){
   // Function allowing to transform nature of nodes and links
+
+  var controlQualities = getControlQualitiesFromNodes(Nodes);
+  var controlNatures = getControlNaturesFromNodes(Nodes);
   var NewLinks = [];
   var NewNodes = [];
   // var informationSystems = [];
@@ -207,8 +245,9 @@ function applicativeViewTransform(Nodes, Links, vizData){
   ////////////////////////////////////////////////////////////////////////////////////////
   // Creating the new nodes containing the apps
   var nbInformationSystems = vizData.informationSystems.length;
-  var equipe, responsable, transformation, controlQuality, controlNature, table;
+  var equipe, responsable, transformation, controlQuality, controlNature, table, champs;
   for (var i = 0; i!= nbInformationSystems; i++){
+    champs = "";
     position = getSegmentedPosition(i, Nodes.length, vizData.Width);
     var etape;
     // Look for step into old nodes
@@ -221,6 +260,7 @@ function applicativeViewTransform(Nodes, Links, vizData){
         controlQuality = Nodes[j]["controlquality"];
         controlNature = Nodes[j]["controlnature"];
         table = Nodes[j]["table"]; 
+        champs = champs + Nodes[j]["champs"] + "\n";
       }
     }
     var newNode = {
@@ -236,7 +276,8 @@ function applicativeViewTransform(Nodes, Links, vizData){
       "istransformed" : transformation,
       "controlquality" : controlQuality,
       "controlnature" : controlNature,
-      "table" : table
+      "table" : table,
+      "champs" : champs
       // "width" : defaultWidth/4,
       // "height" : defaultHeight/2
     };
@@ -259,30 +300,14 @@ function applicativeViewTransform(Nodes, Links, vizData){
         "value": NewNodes[i],
         "controlnature" : getAggregateControlNature(NewNodes[i]["name"], Nodes),
         "controlquality" : getAggregateControlQuality(NewNodes[i]["name"], Nodes),
+        "controlnaturetext" : getAggregateControlNatureText(NewNodes[i]["name"], Nodes, controlNatures),
+        "controlqualitytext" : getAggregateControlNatureText(NewNodes[i]["name"], Nodes, controlNatures),
         "view" : "app",
         "table" : NewNodes[i]["table"],
-        "transformedvariables" : listOfTransformedNodesNames
+        "transformedvariables" : listOfTransformedNodesNames,
+        "champs" : NewNodes[i]["champs"]
       });
   }
-  ////////////////////////////////////////////////////////////////////////////////////////
-  // Check the list of information systems. If the link has not been made, create it
-  // var target;
-  // var source;
-  // var checkLink;
-  // for (var i = 0; i < nbInformationSystems - 1; i++){
-  //   checkLink = checkLinkExistence(NewLinks, i, i+1);
-  //   if ( ! checkLink ){
-  //     NewLinks.push({
-  //       "source" : i,
-  //       "target" : i+1,
-  //       "value" : 1,
-  //       "type" : 5, // information system that is not source of a movement to another information system
-  //       "view" : "app"
-  //     })
-  //   }
-  // }
-  ///////////////////////////////////////////////////////////////////////////////////////
-  ///////////////////////////////////////////////////////////////////////////////////////
 
   ////////////////////////////////////////////////////////////////////////////////////////
   //////////////////// Creating nodes containing variables   ///////////////////////////////
@@ -302,7 +327,10 @@ function applicativeViewTransform(Nodes, Links, vizData){
       "etape" : Nodes[i]["etape"],
       "table" : Nodes[i]["table"],
       "controlquality" : Nodes[i]["controlquality"],
-      "controlnature" : Nodes[i]["controlnature"]
+      "controlnature" : Nodes[i]["controlnature"],
+      "champs" : Nodes[i]["champs"],
+      "controlqualitytext" : Nodes[i]["controlqualitytext"],
+      "controlnaturetext" : Nodes[i]["controlnaturetext"]
       // "width" : defaultWidth / 4,
       // "height" : defaultHeight / 2
     });
@@ -375,19 +403,6 @@ function applicativeViewTransform(Nodes, Links, vizData){
   return [NewNodes, returnLinks, legendData];
 }
 
-// function getAllLinksWithNames(nameNode, NewNodes, Links){
-//   // Get links after parsing between Nodes containing names of variables and ID, and Links built with IDs
-//   for (var i = 0; i < NewNodes.length; i ++){
-//     if ( NewNodes[i].name == nameNode ){
-//       id = NewNodes[i].id;
-//     }
-//   }
-//   for (var i = 0; i < Links.length; i ++){
-//     if ( Links[i].target. == nameNode ){ }
-//   }
-
-// }
-
 function pathViewTransform(Nodes, Links, vizData){
   ////////////////////////////////////////////////////////////////////////////////////////
   // Aim : Creating an array containing the ISs (information systems) ordered, where each previous pours in the following
@@ -427,7 +442,10 @@ function pathViewTransform(Nodes, Links, vizData){
       "y" : 0,
       "informationsystem" : Nodes[i].informationsystem,
       "controlquality" : Nodes[i].controlquality,
-      "controlnature" : Nodes[i].controlnature
+      "controlnature" : Nodes[i].controlnature,
+      "equipe" : Nodes[i].equipe,
+      "champs" : Nodes[i].champs,
+      "etape" : Nodes[i].etape
       // "width" : defaultWidth / 4,
       // "height" : defaultHeight / 2
     });
@@ -437,17 +455,12 @@ function pathViewTransform(Nodes, Links, vizData){
     var targetVariable = Links[i].target;
     var NodeSource = getNodeFromId(NewNodes, sourceVariable);
     var NodeTarget = getNodeFromId(NewNodes, targetVariable);
-    // var typeOfLink = NodeSource["controlquality"];
     var sourceInformationSystem = vizData.informationSystems.indexOf(NodeSource.informationsystem); 
-    // Links[i]["type"] = typeOfLink;
-    // debugger;
     Links[i]["view"] = "path";
     Links[i]["source"] = NodeSource;
     Links[i]["target"] = NodeTarget; 
     Links[i]["controlnature"] = NodeSource["controlnature"];
     Links[i]["controlquality"] = NodeSource["controlquality"];
-    // Links[i]["name"] = NodeSource["name"]
-    // Links[i]["id"] = getNodeFromId(Nodes, Links[i]["id"] );
   }
 
   ////////////////////////////////////////////////////////////////////////////////////////
@@ -499,6 +512,4 @@ function pathViewTransform(Nodes, Links, vizData){
   ////////////////////////////////////////////////////////////////////////////////////////
   // return [NewNodes, Links, legendData];
   return [NewNodes, Links, legendData];
-
-
 }
