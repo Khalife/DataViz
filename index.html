@@ -11,7 +11,7 @@
 <!-- Page contents -->
 
     <!-- Logo -->
-    <img src="http://ey-home.ey.net/wps/themes/html/EYGlobalWeb2/EYlogo.png">
+    <img src="img/EY_logo.png">
     <!-- Main content -->
     <section class="content bgcolor">
         <!-- File picker -->
@@ -24,9 +24,6 @@
             </figure>
             <span>Choisir les donn&eacute;es&hellip;</span>
         </label>
-        <!-- Dataviz startup buttons -->
-        <!-- <button id= "launchOnClickAppView" type="button" onclick="launchDataVizModuleForAppView()">Applicative View</button> -->
-        <!-- <button id= "launchOnClickPathView" type="button" onclick="launchDataVizModuleForPathView()">Path View</button> -->
         <output id="output"></output>
         <br /><br />
         <!-- Tabs -->
@@ -61,7 +58,7 @@
 
                         </section>
                         <section id="section-shape-2">
-                            <!-- Dataviz wrapper - applicative view -->
+                            <!-- Dataviz wrapper - path view -->
                             <div id="chart-path"></div>
                         </section>
                     </div><!-- /content -->
@@ -74,9 +71,16 @@
 <!-- Scripts -->
 
     <!-- 3rd party libs untouched by EY -->
+    <!-- Online versions -->
+    <!-- 
     <script src="http://d3js.org/d3.v3.min.js"></script>
     <script src="https://code.jquery.com/jquery-1.12.1.min.js"></script>
     <script src="https://cdn.rawgit.com/SheetJS/js-xlsx/master/dist/xlsx.core.min.js"></script>
+    -->
+    <!-- Offline versions -->
+    <script src="js/lib/d3.v3.min.js"></script>
+    <script src="js/lib/jquery-1.12.1.min.js"></script>
+    <script src="js/lib/xlsx.core.min.js"></script>
     <script src="js/lib/cbpFWTabs.js"></script>
     <!-- 3rd party libs modified by EY -->
     <script src="js/EY/__Sankey_AppView.js"></script>

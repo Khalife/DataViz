@@ -161,6 +161,17 @@ function getNodeFromId(Nodes, index){
   return null;
 }
 
+function getTransformedNodesFromIS(Nodes, is){
+  var listOfNodesNames = "";
+  for (var n of Nodes){
+    if ( n.informationsystem == is){
+      if (n.transformed == true ){
+        listOfNodesNames = listOfNodesNames + "\n" + n.name;
+      }
+    }
+  }
+  return listOfNodesNames;
+}
 
 function applicativeViewTransform(Nodes, Links, vizData){
 
@@ -196,7 +207,7 @@ function applicativeViewTransform(Nodes, Links, vizData){
   ////////////////////////////////////////////////////////////////////////////////////////
   // Creating the new nodes containing the apps
   var nbInformationSystems = vizData.informationSystems.length;
-  var equipe, responsable;
+  var equipe, responsable, transformation, controlQuality, controlNature, table;
   for (var i = 0; i!= nbInformationSystems; i++){
     position = getSegmentedPosition(i, Nodes.length, vizData.Width);
     var etape;
@@ -206,6 +217,10 @@ function applicativeViewTransform(Nodes, Links, vizData){
         etape = Nodes[j]["etape"];
         equipe = Nodes[j]["equipe"];
         responsable = Nodes[j]["responsable"];
+        transformation = Nodes[j]["istransformed"];
+        controlQuality = Nodes[j]["controlquality"];
+        controlNature = Nodes[j]["controlnature"];
+        table = Nodes[j]["table"]; 
       }
     }
     var newNode = {
@@ -217,7 +232,11 @@ function applicativeViewTransform(Nodes, Links, vizData){
       "y": position[1],
       "etape" : etape,
       "equipe" : equipe,
-      "responsable" : responsable
+      "responsable" : responsable,
+      "istransformed" : transformation,
+      "controlquality" : controlQuality,
+      "controlnature" : controlNature,
+      "table" : table
       // "width" : defaultWidth/4,
       // "height" : defaultHeight/2
     };
@@ -225,17 +244,24 @@ function applicativeViewTransform(Nodes, Links, vizData){
   }
 
   var sourceInformationSystem, targetInformationSystem;
+
   ////////////////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////////////////
   // Creating Links between apps using new nodes
+  var listOfTransformedNodesNames;
   for (var i = 0; i < NewNodes.length - 1; i++){
+      // create list of nodes that are transformed 
+      listOfTransformedNodesNames = getTransformedNodesFromIS(Nodes, NewNodes[i].name);
       NewLinks.push({
+        "linktype" : "informationsystem",
         "source" : NewNodes[i]["id"],
         "target" : NewNodes[i+1]["id"],
         "value": NewNodes[i],
         "controlnature" : getAggregateControlNature(NewNodes[i]["name"], Nodes),
         "controlquality" : getAggregateControlQuality(NewNodes[i]["name"], Nodes),
-        "view" : "app"
+        "view" : "app",
+        "table" : NewNodes[i]["table"],
+        "transformedvariables" : listOfTransformedNodesNames
       });
   }
   ////////////////////////////////////////////////////////////////////////////////////////
@@ -273,7 +299,10 @@ function applicativeViewTransform(Nodes, Links, vizData){
       "x" : 0,
       "y" : 0,
       "informationsystem" : Nodes[i].informationsystem,
-      "etape" : Nodes[i]["etape"]
+      "etape" : Nodes[i]["etape"],
+      "table" : Nodes[i]["table"],
+      "controlquality" : Nodes[i]["controlquality"],
+      "controlnature" : Nodes[i]["controlnature"]
       // "width" : defaultWidth / 4,
       // "height" : defaultHeight / 2
     });
@@ -283,6 +312,7 @@ function applicativeViewTransform(Nodes, Links, vizData){
   for (var i = 0; i < Nodes.length; i++){
     informationsystem = Nodes[i]["informationsystem"];
     NewLinks.push({
+      "linktype" : "variable",
       "source" : lengthWithoutVariables + i,
       "target" : vizData.informationSystems.indexOf(informationsystem),
       "istransformed" : Nodes[i]["istransformed"],
@@ -296,7 +326,17 @@ function applicativeViewTransform(Nodes, Links, vizData){
   /////////////////// Creating legend data /////////////////////////////////////////////
   // Include : elementary variable, calculated variable, information systems and links
   var legendNodeText = ["Variable élémentaire", "Variable calculée", "SI de collecte", "SI d'aggrégation", "SI de restitution"];
-  var legendLinkText = ["Vérification automatique", "Vérification semi-automatique", "Vérification manuelle", "Appartenance variable à un SI", "Variable n'impliquant pas de déplacement"];
+  var legendLinkText = [
+    "Transformée à cette étape",
+    "Non-transformée à cette étape",
+    "Vérification automatique",
+    "Vérification semi-automatique",
+    "Vérification manuelle",
+    "Contrôle OK",
+    "Contrôle KO",
+    "Pas de contrôle",
+    "Pas d'information",
+  ];
    var nbLegendNodes = legendNodeText.length;
   var nbLegendLinks = legendLinkText.length; 
   var legendData = [];
@@ -385,7 +425,9 @@ function pathViewTransform(Nodes, Links, vizData){
       "name" : Nodes[i].name,
       "x" : 0,
       "y" : 0,
-      "informationsystem" : Nodes[i].informationsystem
+      "informationsystem" : Nodes[i].informationsystem,
+      "controlquality" : Nodes[i].controlquality,
+      "controlnature" : Nodes[i].controlnature
       // "width" : defaultWidth / 4,
       // "height" : defaultHeight / 2
     });
@@ -395,21 +437,63 @@ function pathViewTransform(Nodes, Links, vizData){
     var targetVariable = Links[i].target;
     var NodeSource = getNodeFromId(NewNodes, sourceVariable);
     var NodeTarget = getNodeFromId(NewNodes, targetVariable);
-    var typeOfLink = NodeSource["controlquality"];
+    // var typeOfLink = NodeSource["controlquality"];
     var sourceInformationSystem = vizData.informationSystems.indexOf(NodeSource.informationsystem); 
-    Links[i]["type"] = typeOfLink;
+    // Links[i]["type"] = typeOfLink;
+    // debugger;
     Links[i]["view"] = "path";
     Links[i]["source"] = NodeSource;
     Links[i]["target"] = NodeTarget; 
-    Links[i]["controlnature"] = getAggregateControlNature(vizData.informationSystems[sourceInformationSystem], Nodes);
-    Links[i]["controlquality"] = getAggregateControlQuality(vizData.informationSystems[sourceInformationSystem], Nodes);
+    Links[i]["controlnature"] = NodeSource["controlnature"];
+    Links[i]["controlquality"] = NodeSource["controlquality"];
     // Links[i]["name"] = NodeSource["name"]
     // Links[i]["id"] = getNodeFromId(Nodes, Links[i]["id"] );
   }
 
   ////////////////////////////////////////////////////////////////////////////////////////
-  // Build legend for path view : 
+ /////////////////// Creating legend data /////////////////////////////////////////////
+  // Include : elementary variable, calculated variable, information systems and links
+  var legendNodeText = ["Variable élémentaire", "Variable calculée"];
+  var legendLinkText = [
+    "Vérification automatique",
+    "Vérification semi-automatique",
+    "Vérification manuelle",
+    "Contrôle OK",
+    "Contrôle KO",
+    "Pas de contrôle",
+    "Pas d'information",
+  ];
+  var nbLegendNodes = legendNodeText.length;
+  var nbLegendLinks = legendLinkText.length; 
   var legendData = [];
+  var legendPositions = [];
+  var nodeWidth = 27;
+  for (var i = 0; i < nbLegendNodes + nbLegendLinks; i++){
+    var xMargin = 0, yMargin = 0;
+    if ( i <= 1 ){ xMargin = nodeWidth/2;}
+    //if ( i <= 2 ){ yMargin = 45;}
+    legendPositions.push([ LEGEND_X_ANCHOR + xMargin, LEGEND_Y_ANCHOR + i*(nodeWidth + yMargin)]);
+  }
+
+  for (var i = 0; i < nbLegendNodes; i++){
+    legendData.push({
+      "type" : "node",
+      "id" : i,
+      "text" : legendNodeText[i],
+      "x" : legendPositions[i][0],
+      "y" : legendPositions[i][1],
+    })
+
+  }
+  for (var i = 0; i < nbLegendLinks; i++){
+    legendData.push({
+      "type" : "link",
+      "id" : i + nbLegendNodes,
+      "text" : legendLinkText[i],
+      "x" : legendPositions[i+nbLegendNodes][0],
+      "y" : legendPositions[i+nbLegendNodes][1],
+    })
+  }
 
 
   ////////////////////////////////////////////////////////////////////////////////////////

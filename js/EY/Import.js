@@ -87,9 +87,10 @@ function buildVizData(worksheet, numberOfLineBeginning, numberOfLineEnding){
           "informationtype",
           "etape",
           "equipe",
-          "responsable"
+          "responsable",
+          "table"
         ];
-        var tabFieldsColumnLocation = ["A", "B", "D", "C", "AC", "AB", "AD","AF", "Q", "X", "Z", "AJ", "F", "P", "S", "T"];
+        var tabFieldsColumnLocation = ["A", "B", "D", "C", "AC", "AB", "AD","AF", "Q", "X", "Z", "AJ", "F", "P", "S", "T", "V"];
 
         var result = {
           "type": 'Global',
@@ -220,7 +221,8 @@ function createPathNodesAndLinksFromData(data){
       "controlquality" : getControlQuality(data[i]["controlquality"]),
       "etape" : data[i]["etape"],
       "equipe" : data[i]["equipe"],
-      "responsable" : data[i]["responsable"]
+      "responsable" : data[i]["responsable"],
+      "table" : data[i]["table"]
       };
     Nodes.push(newNode);
   }
@@ -236,7 +238,7 @@ function createPathNodesAndLinksFromData(data){
     "code": "",
     "informationsystem": "output",
     "istransformed": "",
-    "informationtype" : "",
+    "informationtype" : "Calculée",
     "controlnature" : "",
     "controlquality" : "",
     "etape" : "",
@@ -247,6 +249,7 @@ function createPathNodesAndLinksFromData(data){
   Nodes.push(outputNode);
 
   var result = [Nodes, Links];
+  // debugger;
   NodesAndLinksForAppView = result;
   NodesAndLinksForPathView = result;
 

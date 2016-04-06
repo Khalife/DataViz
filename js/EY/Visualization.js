@@ -1,6 +1,7 @@
 ﻿'use strict';
 
-var svgAppView, svgPathView, tooltipAppView, tooltipPathView, biHiSankeyAppView, biHiSankeyPathView, pathAppView, pathPathView, defs, colorScale, highlightColorScale, typeColorScale, isColorScale, strokeColorScale, isTransitioning;
+var svgAppView, svgPathView, tooltipAppView, tooltipPathView, biHiSankeyAppView, biHiSankeyPathView,
+    pathAppView, pathPathView, defs, colorScale_NODES, colorScale_OUTLINES, colorScale_LINKS, isTransitioning;
 
 var OPACITY = {
     NODE_DEFAULT: 0.9,
@@ -10,21 +11,27 @@ var OPACITY = {
     LINK_FADED: 0.05,
     LINK_HIGHLIGHT: 0.9
   },
-  TYPES = ["Asset", "Expense", "Revenue", "Equity", "Liability"],
-  TYPE_COLORS = ["#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d"],
-  TYPE_HIGHLIGHT_COLORS = ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854", "#ffd92f", "#e5c494"],
-  LINK_TYPES_COLORS = ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854"],
-  // STROKE_TYPES = [1,2,3], // Saisie - Collecte, Agrégation, Restitution
-  STROKE_TYPES = ["Saisie / Collecte", "Agregation", "Restitution"],
-  STROKE_TYPES_COLORS = ["#00688B", "#838B83", "#FF1493"],
-  LINK_TYPES = [1, 2, 3, 4, 5],
-  LINK_COLOR = "#b3b3b3",
-  INFLOW_COLOR = "#2E86D1",
-  OUTFLOW_COLOR = "#D63028",
+
+  NODES_TYPES = [/* fed in function createColorSets with information systems names coming from transform */],
+  NODES_COLORS = ["#1C86EE", "#6C7B8B", "#CAAECE", "#A751D2", "#571E74", "#E2006A", "#e5c494"],
+  OUTLINES_TYPES = ["Saisie / Collecte", "Agregation", "Restitution"], 
+  OUTLINES_COLORS = ["#00688B", "#838B83", "#FF1493"], 
+  LINKS_TYPES = ["Contrôle OK", "Contrôle KO", "Pas de contrôle", "Pas d'information", "Transformée à cette étape", "Non-transformée à cette étape"],
+  LINKS_COLORS = ["green", "red", "pink", "grey", "orange", "purple"],
+
+  LINK_DEFAULT_COLOR = "grey",
+
   NODE_WIDTH = 12,
   NODE_HEIGHT = 27,
   NODE_INFORMATIONSYSTEM_WIDTH = 80,
   NODE_INFORMATIONSYSTEM_HEIGHT = 40,
+  NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH = "3px",
+
+  NODE_SPACING = 10,
+  LINK_SPACING = 4,
+
+  LINK_CURVATURE = 0.45,
+
   COLLAPSER = {
     RADIUS: NODE_WIDTH / 2,
     SPACING: 2
@@ -41,12 +48,7 @@ var OPACITY = {
   // WIDTH = 960 - MARGIN.LEFT - MARGIN.RIGHT,
   WIDTH = 1100 - MARGIN.LEFT - MARGIN.RIGHT,
   LAYOUT_INTERATIONS = 32,
-  REFRESH_INTERVAL = 7000,
-
-
-  //IS_COLORS_STOCK = ["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854", "#ffd92f", "#e5c494"];
-  IS_COLORS_STOCK = ["#1C86EE", "#6C7B8B", "#CAAECE", "#A751D2", "#571E74", "#E2006A", "#e5c494"];
-
+  REFRESH_INTERVAL = 7000;
 
 
 var formatNumber = function (d) {
@@ -80,9 +82,39 @@ showAppTooltip = function () {
     .transition()
       .duration(TRANSITION_DURATION)
       .style("opacity", 1);
+},
+
+hideAppLinkTooltip = function () {
+  return tooltipAppView.transition()
+    .duration(TRANSITION_DURATION)
+    .style("opacity", 0);
+},
+
+showAppLinkTooltip = function () {
+  return tooltipAppView
+    .style("left", d3.event.pageX + "px")
+    .style("top", d3.event.pageY + 15 + "px")
+    .transition()
+      .duration(TRANSITION_DURATION)
+      .style("opacity", 1);
+},
+
+hidePathTooltip = function () {
+  return tooltipPathView.transition()
+    .duration(TRANSITION_DURATION)
+    .style("opacity", 0);
+},
+
+showPathTooltip = function () {
+  return tooltipPathView
+    .style("left", d3.event.pageX + "px")
+    .style("top", d3.event.pageY + 15 + "px")
+    .transition()
+      .duration(TRANSITION_DURATION)
+      .style("opacity", 1);
 };
 
-function showHideAppChildren(node) {
+function howHideAppChildren(node) {
   disableUserInterractions(2 * TRANSITION_DURATION);
   hideAppTooltip();
   if (node.state === "collapsed") { expand(node); }
@@ -90,6 +122,30 @@ function showHideAppChildren(node) {
 
   biHiSankeyAppView.relayout();
   updateAppView();
+  link.attr("d", pathAppView);
+  restoreLinksAndNodes();
+}
+
+function howHidePathChildren(node) {
+  disableUserInterractions(2 * TRANSITION_DURATION);
+  hideAppTooltip();
+  if (node.state === "collapsed") { expand(node); }
+  else { collapse(node); }
+
+  biHiSankeyAppView.relayout();
+  updateAppView();
+  link.attr("d", pathAppView);
+  restoreLinksAndNodes();
+}
+
+function showHideAppChildren(node){
+  disableUserInterractions(2 * TRANSITION_DURATION);
+  hidePathTooltip();
+  if (node.state === "collapsed") { expand(node);}
+  else { collapse(node); }
+
+  biHiSankeyPathView.relayout();
+  updatePathView();
   link.attr("d", pathAppView);
   restoreLinksAndNodes();
 }
@@ -106,12 +162,16 @@ function showHidePathChildren(node){
   restoreLinksAndNodes();
 }
 
+// Define color sets
 
+function createColorSets(informationSystems) {
+  NODES_TYPES = informationSystems;
+  colorScale_NODES = d3.scale.ordinal().domain(NODES_TYPES).range(NODES_COLORS);
+  colorScale_OUTLINES = d3.scale.ordinal().domain(OUTLINES_TYPES).range(OUTLINES_COLORS);
+  colorScale_LINKS = d3.scale.ordinal().domain(LINKS_TYPES).range(LINKS_COLORS);
+}
 
-colorScale = d3.scale.ordinal().domain(TYPES).range(TYPE_COLORS),
-highlightColorScale = d3.scale.ordinal().domain(TYPES).range(TYPE_HIGHLIGHT_COLORS),
-typeColorScale = d3.scale.ordinal().domain(LINK_TYPES).range(LINK_TYPES_COLORS),
-strokeColorScale = d3.scale.ordinal().domain(STROKE_TYPES).range(STROKE_TYPES_COLORS),
+// End color sets
 
 svgAppView = d3.select("#chart-applicative").append("svg")
         .attr("width", WIDTH + MARGIN.LEFT + MARGIN.RIGHT)
@@ -133,7 +193,7 @@ tooltipAppView.style("opacity", 0)
 defs = svgAppView.append("defs");
 
 defs.append("marker")
-  .style("fill", LINK_COLOR)
+  .style("fill", LINK_DEFAULT_COLOR)
   .attr("id", "arrowVerticalHead")
   .attr("viewBox", "0 0 6 10")
   .attr("refX", "1")
@@ -146,7 +206,7 @@ defs.append("marker")
     .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
 defs.append("marker")
-  .style("fill", LINK_COLOR)
+  .style("fill", LINK_DEFAULT_COLOR)
   .attr("id", "arrowHorizontalHead")
   .attr("viewBox", "0 0 6 10")
   .attr("refX", "1")
@@ -159,7 +219,7 @@ defs.append("marker")
     .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
 defs.append("marker")
-  .style("fill", OUTFLOW_COLOR)
+  .style("fill", LINK_DEFAULT_COLOR)
   .attr("id", "arrowHeadInflow")
   .attr("viewBox", "0 0 6 10")
   .attr("refX", "1")
@@ -172,7 +232,7 @@ defs.append("marker")
     .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
 defs.append("marker")
-  .style("fill", INFLOW_COLOR)
+  .style("fill", LINK_DEFAULT_COLOR)
   .attr("id", "arrowHeadOutflow")
   .attr("viewBox", "0 0 6 10")
   .attr("refX", "1")
@@ -204,7 +264,7 @@ tooltipAppView.style("opacity", 0)
 defs = svgPathView.append("defs");
 
 defs.append("marker")
-  .style("fill", LINK_COLOR)
+  .style("fill", LINK_DEFAULT_COLOR)
   .attr("id", "arrowVerticalHead")
   .attr("viewBox", "0 0 6 10")
   .attr("refX", "1")
@@ -217,7 +277,7 @@ defs.append("marker")
     .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
 defs.append("marker")
-  .style("fill", LINK_COLOR)
+  .style("fill", LINK_DEFAULT_COLOR)
   .attr("id", "arrowHorizontalHead")
   .attr("viewBox", "0 0 6 10")
   .attr("refX", "1")
@@ -230,7 +290,7 @@ defs.append("marker")
     .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
 defs.append("marker")
-  .style("fill", OUTFLOW_COLOR)
+  .style("fill", LINK_DEFAULT_COLOR)
   .attr("id", "arrowHeadInflow")
   .attr("viewBox", "0 0 6 10")
   .attr("refX", "1")
@@ -243,7 +303,7 @@ defs.append("marker")
     .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
 defs.append("marker")
-  .style("fill", INFLOW_COLOR)
+  .style("fill", LINK_DEFAULT_COLOR)
   .attr("id", "arrowHeadOutflow")
   .attr("viewBox", "0 0 6 10")
   .attr("refX", "1")
@@ -255,34 +315,11 @@ defs.append("marker")
   .append("path")
     .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
-// function highlightConnected(g) {
-//   link.filter(function (d) { return d.source === g; })
-//     .style("marker-end", function () { return 'url(#arrowHeadInflow)'; })
-//     .style("stroke", OUTFLOW_COLOR)
-//     .style("opacity", OPACITY.LINK_DEFAULT);
-
-//   link.filter(function (d) { return d.target === g; })
-//     .style("marker-end", function () { return 'url(#arrowHeadOutlow)'; })
-//     .style("stroke", INFLOW_COLOR)
-//     .style("opacity", OPACITY.LINK_DEFAULT);
-// }
-
-// function fadeUnconnected(g) {
-//   link.filter(function (d) { return d.source !== g && d.target !== g; })
-//     .style("marker-end", function () { return 'url(#arrowHead)'; })
-//     .transition()
-//       .duration(TRANSITION_DURATION)
-//       .style("opacity", OPACITY.LINK_FADED);
-
-//   node.filter(function (d) {
-//     return (d.name === g.name) ? false : !biHiSankey.connected(d, g);
-//   }).transition()
-//     .duration(TRANSITION_DURATION)
-//     .style("opacity", OPACITY.NODE_FADED);
-// }
 
 function updateAppView () {
+  
   var link, linkEnter, node, nodeEnter, collapser, collapserEnter, legend;
+  
   function dragmove(node) {
     node.x = Math.max(0, Math.min(WIDTH - node.width, d3.event.x));
     node.y = Math.max(0, Math.min(HEIGHT - node.height, d3.event.y));
@@ -293,12 +330,12 @@ function updateAppView () {
   }
 
   function containChildren(node) {
-      node.children.forEach(function (child) {
-        child.state = "contained";
-        child.parent = this;
-        child._parent = null;
-        containChildren(child);
-      }, node);
+    node.children.forEach(function (child) {
+      child.state = "contained";
+      child.parent = this;
+      child._parent = null;
+      containChildren(child);
+    }, node);
   }
 
   function expand(node) {
@@ -316,52 +353,10 @@ function updateAppView () {
     containChildren(node);
   }
 
-  function restoreLinksAndNodes() {
-    link
-      .style("stroke", function (d){return typeColorScale(d.type);})
-      .style("marker-end", function (d) { if ( d.source == "variable"){ return 'url(#arrowVerticalHead)';} else { return 'url(#arrowHorizontalHead)';} }) //return 'url(#arrowHead)'; })
-      .transition()
-        .duration(TRANSITION_DURATION)
-        .style("opacity", OPACITY.LINK_DEFAULT);
-
-    node.filter(function (d){ if ( d.type === "variable" ){return true;}})
-      .selectAll("rect")
-      .style("fill", function (d) {
-        d.color = colorScale(d.type.replace(/ .*/, ""));
-        return d.color;
-      })
-      .style("stroke", function (d) {
-        return d3.rgb(colorScale(d.type.replace(/ .*/, ""))).darker(0.1);
-      })
-      .style("fill-opacity", OPACITY.NODE_DEFAULT)
-      .attr("width", NODE_WIDTH)
-      .attr("height", NODE_HEIGHT);
-
-    node.filter(function (d){ if (d.type === "informationsystem"){return true;}})
-      .selectAll("rect")
-      .style("fill", function (d) {
-        //d.color = colorScale(d.type.replace(/ .*/, ""));
-        d.color = isColorScale(d.name);
-        return d.color;
-      })
-      // .style("stroke", function (d) {
-      //   return d3.rgb(colorScale(d.type.replace(/ .*/, ""))).darker(0.1);
-      // })
-      .style("fill-opacity", OPACITY.NODE_DEFAULT)
-      .attr("width", NODE_INFORMATIONSYSTEM_WIDTH)
-      .attr("height", NODE_INFORMATIONSYSTEM_HEIGHT);
-    }
-
   function computePolygonCoordonates(radius){
     // Function to be called inside function to draw polygon (svg)
     // Returns hexagone local coordinates starting from top left corner, in string form to be used with SVG
     var corners = [], cornersString = "";
-    // corners.push([node.x - radius / 2, node.y - radius]);
-    // corners.push([ node.x + radius / 2, node.y - radius]);
-    // corners.push([ node.x + radius, node.y ]);
-    // corners.push([ node.x + radius / 2, node.y + radius]);
-    // corners.push([ node.x - radius / 2, node.y + radius]);
-    // corners.push([ node.x - radius, node.y]);
 
     corners.push([ - radius / 2, - radius]);
     corners.push([ radius / 2, - radius]);
@@ -377,54 +372,105 @@ function updateAppView () {
     return cornersString;
   }
 
+  function computeLinkPolygonCoordonates(height, width){
+    // Function used to compute polygon coordonates
+    // Returns link local coordinates starting from top left corner, in string form to be used with SVG
+    var corners = [], cornersString = "";
+    corners.push([ 0, - height/2]);
+    corners.push([ 0.85*width, -height/2]);
+    corners.push([ width, 0]);
+    corners.push([ 0.85*width, height/2]);
+    corners.push([ 0,  height/2]);
+    
+    for (var i = 0; i != 4; i++){
+      cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
+    }
+    cornersString = cornersString + corners[4][0].toString() + "," + corners[4][1].toString();
+    return cornersString;
+  }
 
-  link = svgAppView.select("#links").selectAll("path.link")
-    .data(biHiSankeyAppView.visibleLinks(), function (d) { return d.id; });
+  function threeStepFunction(value, listValues){
+    if ( value == 0){
+      return 1;
+    }
+    if ( ( 1 <= value ) && ( value < listValues.length - 1) ) {
+      return 2;
+    }
+    if ( value == listValues.length - 1){
+      return 3;
+    }
+  }
 
-  link.transition()
-    .duration(TRANSITION_DURATION)
-    .style("stroke-WIDTH", function (d) { return Math.max(1, d.thickness); })
-    .attr("d", pathAppView)
-    .style("opacity", OPACITY.LINK_DEFAULT);
+  function eliminateStepStringError(etapeString){
+    if (etapeString == "Agrégation"){
+      return "Agregation";
+    }
+    return etapeString;
+  }
 
+  function restoreLinksAndNodes() {
+    link
+      .style("stroke-WIDTH", function (d) { return Math.max(1, d.thickness); })
+      .style("stroke-dasharray", function (d){ return (d.dash || "");})
+      .style("stroke", function (d){
+        var color;
+        if (d.linktype == "variable") {
+          color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
+        } else {
+          color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+        }
+        return color;
+      })
+      .style("marker-end", function (d) { if ( d.source == "variable"){ return 'url(#arrowVerticalHead)';} else { return 'url(#arrowHorizontalHead)';} }) //return 'url(#arrowHead)'; })
+      .transition()
+        .duration(TRANSITION_DURATION)
+        .style("opacity", OPACITY.LINK_DEFAULT);
+
+    node.filter(function (d){ if ( d.type === "variable" ){return true;}})
+      .selectAll("rect")
+      .style("fill", function (d) {
+        d.color = colorScale_NODES(d.informationsystem);
+        return d.color;
+      })
+      .style("fill-opacity", OPACITY.NODE_DEFAULT)
+      .attr("width", NODE_WIDTH)
+      .attr("height", NODE_HEIGHT);
+
+    node.filter(function (d){ if (d.type === "informationsystem"){return true;}})
+      .selectAll("rect")
+      .style("fill", function (d) {
+        d.color = colorScale_NODES(d.name);
+        return d.color;
+      })
+      .style("fill-opacity", OPACITY.NODE_DEFAULT)
+      .attr("width", NODE_INFORMATIONSYSTEM_WIDTH)
+      .attr("height", NODE_INFORMATIONSYSTEM_HEIGHT);
+  }
+
+  link = svgAppView.select("#links").selectAll("path.link").data(biHiSankeyAppView.visibleLinks(), function (d) { return d.id; });
 
   link.exit().remove();
 
+  link.transition()
+    .duration(TRANSITION_DURATION)
+    .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
+    .style("stroke-dasharray", function (d){ return (d.dash || "");})
+    .style("stroke", function (d){
+      var color;
+      if (d.linktype == "variable") {
+        color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
+      } else {
+        color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+      }
+      return color;
+    })
+    .attr("d", pathAppView)
+    .style("opacity", OPACITY.LINK_DEFAULT);
 
   linkEnter = link.enter().append("path")
     .attr("class", "link")
-    .style("fill", function (d){return "white";/*typeColorScale(d.type);*/});
+    .style("fill", function (d){return "white"});
 
-  // linkEnter.on('mouseenter', function (d) {
-  //   if (!isTransitioning) {
-  //     showTooltip().select(".value").text(function () {
-  //       if (d.direction > 0) {
-  //         return d.source.name + " → " + d.target.name + "\n" + formatNumber(d.value);
-  //       }
-  //       return d.target.name + " ← " + d.source.name + "\n" + formatNumber(d.value);
-  //     });
-
-  //     d3.select(this)
-  //       .style("stroke", function (d){return typeColorScale(d.type);})
-  //       .transition()
-  //         .duration(TRANSITION_DURATION / 2)
-  //         .style("opacity", OPACITY.LINK_HIGHLIGHT);
-  //   }
-  // });
-
-  // linkEnter.on('mouseleave', function () {
-  //   if (!isTransitioning) {
-  //     hideTooltip();
-
-  //     d3.select(this)
-  //       .style("stroke", function (d){return typeColorScale(d.type);})
-  //       .transition()
-  //         .duration(TRANSITION_DURATION / 2)
-  //         .style("opacity", OPACITY.LINK_DEFAULT);
-  //   }
-  // });
-
-  // To include link type dependancy for arrowhead : marker-head
   linkEnter.sort(function (a, b) { return b.thickness - a.thickness; })
     .classed("leftToRight", function (d) {
       return d.direction > 0;
@@ -441,47 +487,38 @@ function updateAppView () {
         return 'url(#arrowHorizontalHead)';
       }
     })
-    //.style("stroke", LINK_COLOR)
-    .style("stroke", function (d){return typeColorScale(d.type);})
+    .style("stroke", function (d){
+      var color;
+      if (d.linktype == "variable") {
+        color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
+      } else {
+        color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+      }
+      return color;
+    })
     .style("opacity", 0)
     .transition()
       .delay(TRANSITION_DURATION)
       .duration(TRANSITION_DURATION)
       .attr("d", pathAppView)
-      .style("stroke-WIDTH", function (d) { return Math.max(1, d.thickness); })
-      .style("stroke-dasharray", function (d) { return (d.dash || ""); })
+      .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
+      .style("stroke-dasharray", function (d){ return (d.dash || "");})
+      .style("stroke", function (d){
+        var color;
+        if (d.linktype == "variable") {
+          color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
+        } else {
+          color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+        }
+        return color;
+      })
       .style("opacity", OPACITY.LINK_DEFAULT);
 
-  node = svgAppView.select("#nodes").selectAll(".node")
-      .data(biHiSankeyAppView.collapsedNodes(), function (d) { return d.id; });
-  // nodesByXPosition.forEach(function (nodes) {
-  //   nodes.forEach(function (node, i) {
-  //     node.y = i;
-  //     node.heightAllowance = node.value * yScaleFactor + linkSpacing * node.linkSpaceCount;
-  //   });
-  // });
-  // node.forEach(function (nodes) {
-  //       nodes.forEach(function (node, i) {
-  //         node.y = i;
-  //         node.heightAllowance = node.value * yScaleFactor + linkSpacing * node.linkSpaceCount;
-  //       });
-  //     });
-
+  node = svgAppView.select("#nodes").selectAll(".node").data(biHiSankeyAppView.collapsedNodes(), function (d) { return d.id; });
 
   node.transition()
     .duration(TRANSITION_DURATION)
-    .attr("transform", function (d) { return "translate(" + d.x + "," + d.y + ")"; })
-    .style("opacity", OPACITY.NODE_DEFAULT)
-    .select("rect")
-      .style("fill", function (d) {
-        d.color = colorScale(d.type.replace(/ .*/, ""));
-        return d.color;
-      })
-      .style("stroke", function (d) { return d3.rgb(colorScale(d.type.replace(/ .*/, ""))).darker(0.1); })
-      .style("stroke-WIDTH", "1px")
-      .attr("height", function (d) { return NODE_HEIGHT; })
-      .attr("width", biHiSankeyAppView.nodeWidth());
-
+    .attr("transform", function (d) { return "translate(" + d.x + "," + d.y + ")"; });
 
   node.exit()
     .transition()
@@ -512,120 +549,130 @@ function updateAppView () {
 
   nodeEnter.append("text");
 
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Version 2 where variables are appended a circle and information systems are appended a rectangle
-  function threeStepFunction(value, listValues){
-    if ( value == 0){
-      return 1;
-    }
-    if ( ( 1 <= value ) && ( value < listValues.length - 1) ) {
-      return 2;
-    }
-    if ( value == listValues.length - 1){
-      return 3;
-    }
-  }
+  // Create App Nodes
 
-  function eliminateStepStringError(etapeString){
-    if (etapeString == "Agrégation"){
-      return "Agregation";
-    }
-    return etapeString;
-  }
+  var nodeInformationSystem = node.filter(function (d){ if (d.type === "informationsystem"){return true;}});
 
-  var nodeInformationSystem = node.filter(function (d){ return d.type === "informationsystem";});
-  var nodeVariable = node.filter(function (d){ return d.type === "variable";});
-  nodeInformationSystem.append("rect")
-    .style("fill", function (d) {
-    d.color = isColorScale( d.name ); // different colors for apps and variables
-    return d.color;
-    })
-    .style("stroke", function (d) {
-    // var strokeIndex = threeStepFunction(informationSystems.indexOf(d.name), informationSystems); return d3.rgb(strokeColorScale(strokeIndex)).darker(0.1);
-    var etape = eliminateStepStringError(d.etape); return d3.rgb(strokeColorScale(etape)); 
-    }) // stroke color : depending on the position of the information system in the list
-    .style("stroke-WIDTH", "3px")
-    .attr("height", NODE_INFORMATIONSYSTEM_HEIGHT)
-    //.attr("width", biHiSankeyAppView.nodeWidth());
+  nodeInformationSystem
+    .append("rect")
     .attr("width", NODE_INFORMATIONSYSTEM_WIDTH)
+    .attr("height", NODE_INFORMATIONSYSTEM_HEIGHT)
+    .style("fill", function (d) {
+      d.color = colorScale_NODES(d.name);
+      return d.color;
+    })
+    .style("fill-opacity", OPACITY.NODE_DEFAULT)
+    .style("stroke", function (d) {
+      var etape = eliminateStepStringError(d.etape);
+      return d3.rgb(colorScale_OUTLINES(etape)); 
+    })
+    .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+
+  nodeInformationSystem.select("text")
+    .attr("x", function (d) {return d.width;})
+    .attr("y", function (d) {return -10;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "end")
+    .attr("transform", null)
+    .text(function (d) { return d.name; });
+
+  // Create Variable Nodes
 
   var nodeVariableCalculated = node.filter(function (d){ return ( ( d.type === "variable" ) && ( d.iscalculated ) ) ;});
-  var nodeVariableElementary = node.filter(function (d){ return ( ( d.type === "variable" ) && ( ! d.iscalculated ) ) ;});
-  nodeVariableCalculated.append("circle")
-    .style("fill", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
-    .attr("r", NODE_HEIGHT / 2);
 
-  nodeVariableElementary.append("polygon")       // attach a polygon
-    .style("stroke", "black")  // colour the line
-    .style("stroke-WIDTH", "1px")
-    .style("fill",  function (d){d.color = isColorScale(d.informationsystem); return d.color;})
-    //.style("fill", function (d){d.color = colorScale(d.type.replace(/ .*/, "")); return d.color;})     // remove any fill colour
-    .attr("points", function (d){  return computePolygonCoordonates(NODE_HEIGHT/2); } );  // x,y points 
+  nodeVariableCalculated
+    .append("circle")
+    .attr("r", NODE_HEIGHT / 2)
+    .style("fill", function (d) {
+      d.color = colorScale_NODES(d.informationsystem);
+      return d.color;
+    })
+    .style("fill-opacity", OPACITY.NODE_DEFAULT);
 
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////
-  
-  // node.on("mouseenter", function (g) {
-  //   if (!isTransitioning) {
-  //     // highlightConnected(g);
-  //     restoreLinksAndNodes();
-  //     // fadeUnconnected(g);
+  nodeVariableCalculated.select("text")
+    .attr("x", function (d) {return (5/2)*d.name.length;})
+    .attr("y", function (d) {return d.height / 2 + 10 ;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "end")
+    .attr("transform", null)
+    .text(function (d) { return d.name; });
 
-  //     // d3.select(this).select("rect")
-  //     //   .style("fill", function (d) {
-  //     //     // d.color = d.netFlow > 0 ? INFLOW_COLOR : OUTFLOW_COLOR;
+  var nodeVariableElementary = node.filter(function (d){ return ( ( d.type === "variable" ) && !( d.iscalculated ) ) ;});
 
-  //     //     return d.color;
-  //     //   })
-  //     //   .style("stroke", function (d) {
-  //     //     return d3.rgb(d.color).darker(0.1);
-  //     //   })
-  //     //   .style("fill-opacity", OPACITY.LINK_DEFAULT);
+  nodeVariableElementary
+    .append("polygon")       // attach a polygon
+    .attr("points", function (d){  return computePolygonCoordonates(NODE_HEIGHT/2); } )
+    .style("fill", function (d) {
+      d.color = colorScale_NODES(d.informationsystem);
+      return d.color;
+    })
+    .style("fill-opacity", OPACITY.NODE_DEFAULT);
 
-  //     tooltip
-  //       .style("left", g.x + MARGIN.LEFT + "px")
-  //       .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
-  //       .transition()
-  //         .duration(TRANSITION_DURATION)
-  //         .style("opacity", 1).select(".value")
-  //         .text(function () {
-  //           var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-  //           return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
-  //         });
-  //   }
-  // });
+  nodeVariableElementary.select("text")
+    .attr("x", function (d) {return (5/2)*d.name.length;})
+    .attr("y", function (d) {return d.height / 2 + 10 ;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "end")
+    .attr("transform", null)
+    .text(function (d) { return d.name; });
 
-  nodeVariableCalculated.on("mouseEnter", function (g){
-    if (!isTransitioning){
-      restoreLinksAndNodes();
+  // Create and attach tooltips
+
+  var linkBetweenApps = link.filter(function (l){return l.linktype == "informationsystem";});
+
+  linkBetweenApps.on('mouseenter', function (d) {
+    if (!isTransitioning) {
+      showAppLinkTooltip().select(".value").text(function () {
+        if (d.direction > 0) {
+          return d.source.name + " → " + d.target.name + "\n" + CONTROL_QUALITY[d.controlquality] + "\n" + d.transformedvariables + "\n" + CONTROL_NATURE[d.controlnature];
+
+        }
+        return d.target.name + " ← " + d.source.name + "\n" + CONTROL_QUALITY[d.controlquality] + "\n" + d.transformedvariables+ "\n" + CONTROL_NATURE[d.controlnature];
+      });
+    }
+  });
+
+  linkBetweenApps.on('mouseleave', function () {
+    if (!isTransitioning) {
+      hideAppLinkTooltip();
+    }
+  });
+
+  nodeVariableElementary.on("mouseenter", function (g) {
+    if (!isTransitioning) {
+      // highlightConnected(g);
+      // restoreLinksAndNodes();
       tooltipAppView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
           .duration(TRANSITION_DURATION)
           .style("opacity", 1).select(".value")
-          .text(function (g) {
+          .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
-            // return g.informationsystem + "\n" + g.name;
-            return "ok";
+            var reverseControlQuality = CONTROL_QUALITY[g.controlquality - 1];
+            var reverseControlNature = CONTROL_NATURE[g.controlnature - 1]; 
+            debugger;
+            return g.table + "\n" + "SI " + g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
           });
     }
   });
 
-  nodeVariableElementary.on("mouseEnter", function (g){
-    if (!isTransitioning){
-      restoreLinksAndNodes();
+  nodeVariableCalculated.on("mouseenter", function (g) {
+    if (!isTransitioning) {
+      // highlightConnected(g);
+      // restoreLinksAndNodes();
       tooltipAppView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
           .duration(TRANSITION_DURATION)
           .style("opacity", 1).select(".value")
-          .text(function (g) {
+          .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
-            // return g.informationsystem + "\n" + g.name;
-            return "ok";
+            var reverseControlQuality = CONTROL_QUALITY[g.controlquality - 1];
+            var reverseControlNature = CONTROL_NATURE[g.controlnature - 1]; 
+            return g.table + "\n" + "SI " +  g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
           });
     }
   });
@@ -647,7 +694,6 @@ function updateAppView () {
     }
   });
 
-
   node.on("mouseleave", function () {
     if (!isTransitioning) {
       hideAppTooltip();
@@ -658,114 +704,40 @@ function updateAppView () {
   node.filter(function (d) { return d.children.length; })
     .on("dblclick", showHideAppChildren);
 
-  // allow nodes to be dragged to new positions
   node.call(d3.behavior.drag()
     .origin(function (d) { return d; })
     .on("dragstart", function () { this.parentNode.appendChild(this); })
     .on("drag", dragmove));
 
-  // add in the text for the nodes
-  // node.filter(function (d) { return d.value !== 0; })
-  //   .select("text")
-  //     .attr("x", function (d) {return d.width;} )
-  //     .attr("y", function (d) { return d.height; })
-  //     .attr("dy", ".35em")
-  //     .attr("text-anchor", "end")
-  //     .attr("transform", null)
-  //     .text(function (d) { return d.name; })
-  //   .filter(function (d) { return d.x < WIDTH / 2; })
-  //     .attr("x", 6 + biHiSankeyAppView.nodeWidth())
-  //     .attr("text-anchor", "start");
+  // Create and attach legend
 
-  nodeInformationSystem.select("text")
-    .attr("x", function (d) {return d.width;})
-    .attr("y", function (d) {return -10;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "end")
-    .attr("transform", null)
-    .text(function (d) { return d.name; });
-
-  nodeVariable.select("text")
-    .attr("x", function (d) {return (5/2)*d.name.length;})
-    .attr("y", function (d) {return d.height / 2 + 10 ;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "end")
-    .attr("transform", null)
-    .text(function (d) { return d.name; });
-
-
-  // node.filter(function (d) {return d.type == "informationsystem";})
-  //     .attr("name", function (d){debugger; return 0;})
-  //     .select("rect")
-  //     .attr("y", function (d) {return 0;});
-  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Legend - to be included in a collapser ?!
-  // var legendData = [{"id" : 1, "type" : "elementaryVariable", "x" : 400, "y" : 800}];
   legend = svgAppView.select("#legend").selectAll(".legend").data(biHiSankeyAppView.legendData(), function (l) { return l.id; }); // intermediate
-
-  function computePolygonCoordonates(radius){
-    // Function to be called inside function to draw polygon (svg)
-    // Returns hexagone local coordinates starting from top left corner, in string form to be used with SVG
-    var corners = [], cornersString = "";
-    // corners.push([node.x - radius / 2, node.y - radius]);
-    // corners.push([ node.x + radius / 2, node.y - radius]);
-    // corners.push([ node.x + radius, node.y ]);
-    // corners.push([ node.x + radius / 2, node.y + radius]);
-    // corners.push([ node.x - radius / 2, node.y + radius]);
-    // corners.push([ node.x - radius, node.y]);
-
-    corners.push([ - radius / 2, - radius]);
-    corners.push([ radius / 2, - radius]);
-    corners.push([ radius, 0 ]);
-    corners.push([ radius / 2, radius]);
-    corners.push([ - radius / 2,  radius]);
-    corners.push([ - radius, 0]);
-    
-    for (var i = 0; i != 5; i++){
-      cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
-    }
-    cornersString = cornersString + corners[5][0].toString() + "," + corners[5][1].toString();
-    return cornersString;
-  }
-
-  function computeLinkPolygonCoordonates(radius){
-    // Function used to compute polygon coordonates
-    // Returns link local coordinates starting from top left corner, in string form to be used with SVG
-    var corners = [], cornersString = "";
-    corners.push([ 0, - radius/4]);
-    corners.push([ 2*radius, -radius/4]);
-    corners.push([ 2*radius + radius/4, 0]);
-    corners.push([ 2*radius, radius/4]);
-    corners.push([ 0,  radius/4]);
-    
-    for (var i = 0; i != 4; i++){
-      cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
-    }
-    cornersString = cornersString + corners[4][0].toString() + "," + corners[4][1].toString();
-    return cornersString;
-  }
 
   var legendEnter = legend.enter().append("g")
                       .attr("class", "legend")
                       .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";})
 
-  var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );});
-  var legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );});
-  var legendCollectInformationSystems = legend.filter(function (l){ return (l.text == "SI de collecte");});
-  var legendAgregationInformationSystems = legend.filter(function (l){ return (l.text == "SI d'aggrégation");});
-  var legendRestitutionInformationSystems = legend.filter(function (l){ return (l.text == "SI de restitution");});
-  var legendVariableISLink = legend.filter(function (l){ return l.text == "Appartenance variable à un SI";});
-  var legendAutomaticLink = legend.filter(function (l){ return l.text == "Vérification automatique";});
-  var legendSemiAutomaticLink = legend.filter(function (l){ return l.text == "Vérification semi-automatique";});
-  var legendManualLink = legend.filter(function (l){ return l.text == "Vérification manuelle"});
-  // var legendLinkAutomatic = legend.filter( function (l) { return l.type == "automaticlink"});
-  // var legendLinkSemiAutomatic = legend.filter( function (l) { return l.type == "semiautomatic"})
-  // 1 - Elementary variables
-  legendElementaryVariables.append("polygon") 
+  var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );}),
+      legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );}),
+      legendCollectInformationSystems = legend.filter(function (l){ return (l.text == "SI de collecte");}),
+      legendAgregationInformationSystems = legend.filter(function (l){ return (l.text == "SI d'aggrégation");}),
+      legendRestitutionInformationSystems = legend.filter(function (l){ return (l.text == "SI de restitution");}),
+      legendAutomaticLink = legend.filter(function (l){ return l.text == "Vérification automatique";}),
+      legendSemiAutomaticLink = legend.filter(function (l){ return l.text == "Vérification semi-automatique";}),
+      legendManualLink = legend.filter(function (l){ return l.text == "Vérification manuelle"}),
+      legendTransformedLink = legend.filter(function (l){ return l.text == "Transformée à cette étape"}),
+      legendNonTransformedLink = legend.filter(function (l){ return l.text == "Non-transformée à cette étape"}),
+      legendQualityOKLink = legend.filter(function (l){ return l.text == "Contrôle OK"}),
+      legendQualityKOLink = legend.filter(function (l){ return l.text == "Contrôle KO"}),
+      legendQualityNOLink = legend.filter(function (l){ return l.text == "Pas de contrôle"}),
+      legendQualityNALink = legend.filter(function (l){ return l.text == "Pas d'information"});
+
+    // 1 - Elementary / Calculated variables
+  legendElementaryVariables.append("polygon")
+    .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } )
     .style("stroke", "black")  // colour the line
-    .style("stroke-WIDTH", "2px")
-    .style("fill", "#FFFFFF")
-    .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } );  // x,y points 
+    .style("stroke-width", "1px")
+    .style("fill", "#FFFFFF");
 
   legendElementaryVariables.append("text")
     .attr("x", function (d) {return "20px";})
@@ -775,12 +747,11 @@ function updateAppView () {
     .attr("transform", null)
     .text(function (d) { return d.text; });
 
-  // 2 - Calculated variables
   legendCalculatedVariables.append("circle")
-    .style("stroke", "black")
-    .style("stroke-WIDTH", "2px")
     .attr("fill", " #FFFFFF")
     .attr("r", NODE_WIDTH/2)
+    .style("stroke", "black")
+    .style("stroke-width", "1px");
 
   legendCalculatedVariables.append("text")
     .attr("x", function (d) {return "20px";})
@@ -790,36 +761,35 @@ function updateAppView () {
     .attr("transform", null)
     .text(function (d) { return d.text; });
 
-  // 3 - Information systems
+    // 2 - Information systems
   legendCollectInformationSystems.append("rect")
-    .style("stroke", strokeColorScale(1))
-    .style("stroke-WIDTH", "2px")
     .attr("fill", "#FFFFFF")
-    .attr("x", function(d) {return "8px";})
+    .attr("x", function(d) {return 0;})
     .attr("y", function(d) {return -NODE_WIDTH/2;})
-    .attr("width", NODE_HEIGHT/2)
+    .attr("width", NODE_HEIGHT)
     .attr("height", NODE_WIDTH)
+    .style("stroke", colorScale_OUTLINES("Saisie / Collecte"))
+    .style("stroke-width", "2px");
 
   legendCollectInformationSystems.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
     .attr("y", function (d) {return 0;})
     .attr("dy", ".35em")
     .attr("text-anchor", "start")
     .attr("transform", null)
     .text(function (d) { return d.text; });  
 
-
   legendAgregationInformationSystems.append("rect")
-    .style("stroke", strokeColorScale(2))
-    .style("stroke-WIDTH", "2px")
     .attr("fill", "#FFFFFF")
-    .attr("x", function(d) {return "8px";})
+    .attr("x", function(d) {return 0;})
     .attr("y", function(d) {return -NODE_WIDTH/2;})
-    .attr("width", NODE_HEIGHT/2)
+    .attr("width", NODE_HEIGHT)
     .attr("height", NODE_WIDTH)
+    .style("stroke", colorScale_OUTLINES("Aggregation"))
+    .style("stroke-width", "2px");
 
   legendAgregationInformationSystems.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
     .attr("y", function (d) {return 0;})
     .attr("dy", ".35em")
     .attr("text-anchor", "start")
@@ -827,21 +797,28 @@ function updateAppView () {
     .text(function (d) { return d.text; });  
 
   legendRestitutionInformationSystems.append("rect")
-    .style("stroke", strokeColorScale(3))
-    .style("stroke-WIDTH", "2px")
     .attr("fill", "#FFFFFF")
-    .attr("x", function(d) {return "8px";})
+    .attr("x", function(d) {return 0;})
     .attr("y", function(d) {return -NODE_WIDTH/2;})
-    .attr("width", NODE_HEIGHT/2)
+    .attr("width", NODE_HEIGHT)
     .attr("height", NODE_WIDTH)
+    .style("stroke", colorScale_OUTLINES("Restitution"))
+    .style("stroke-width", "2px")
 
   legendRestitutionInformationSystems.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
     .attr("y", function (d) {return 0;})
     .attr("dy", ".35em")
     .attr("text-anchor", "start")
     .attr("transform", null)
     .text(function (d) { return d.text; });  
+
+    // 3 - Links
+  legendAutomaticLink.append("polygon")
+    .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )
+    .style("stroke", LINK_DEFAULT_COLOR)
+    .style("stroke-width", "2px")
+    .style("fill", LINK_DEFAULT_COLOR);
 
   legendAutomaticLink.append("text")
     .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
@@ -851,11 +828,14 @@ function updateAppView () {
     .attr("transform", null)
     .text(function (d) { return d.text; });
 
-  legendAutomaticLink.append("polygon")
-    .style("stroke", "#a6d854")  // colour the line
-    .style("stroke-WIDTH", "2px")
-    .style("fill", "#a6d854")
-    .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
+  legendSemiAutomaticLink.append("line")
+    .attr("x1", function(d) {return 0;})
+    .attr("y1", function(d) {return 0;})
+    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+    .attr("y2", function(d) {return 0;})
+    .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
+    .style("stroke-width", "2px")
+    .style("fill", LINK_DEFAULT_COLOR);
 
   legendSemiAutomaticLink.append("text")
     .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
@@ -865,11 +845,15 @@ function updateAppView () {
     .attr("transform", null)
     .text(function (d) { return d.text; });
 
-  legendSemiAutomaticLink.append("polygon")
-    .style("stroke", "#fc8d62")  // colour the line
-    .style("stroke-WIDTH", "2px")
-    .style("fill", "#fc8d62")
-    .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
+  legendManualLink.append("line")
+    .attr("x1", function(d) {return 0;})
+    .attr("y1", function(d) {return 0;})
+    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+    .attr("y2", function(d) {return 0;})
+    .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
+    .style("stroke-width", "2px")
+    .style("stroke-dasharray", "5,5")
+    .style("fill", LINK_DEFAULT_COLOR);
 
   legendManualLink.append("text")
     .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
@@ -879,120 +863,370 @@ function updateAppView () {
     .attr("transform", null)
     .text(function (d) { return d.text; });
 
-  legendManualLink.append("polygon")
-    .style("stroke", "#8da0cb")  // colour the line
-    .style("stroke-WIDTH", "2px")
-    .style("fill", "#8da0cb")
-    .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
+  legendTransformedLink.append("line")
+    .attr("x1", function(d) {return 0;})
+    .attr("y1", function(d) {return 0;})
+    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+    .attr("y2", function(d) {return 0;})
+    .style("stroke", d3.rgb(LINKS_COLORS[4]))  // colour the line
+    .style("stroke-width", "2px")
+    .style("opacity", 0.6)
+    .style("fill", d3.rgb(LINKS_COLORS[4]));
 
+  legendTransformedLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
+  legendNonTransformedLink.append("line")
+    .attr("x1", function(d) {return 0;})
+    .attr("y1", function(d) {return 0;})
+    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+    .attr("y2", function(d) {return 0;})
+    .style("stroke", d3.rgb(LINKS_COLORS[5]))  // colour the line
+    .style("stroke-width", "2px")
+    .style("opacity", 0.6)
+    .style("fill", d3.rgb(LINKS_COLORS[5]));
 
-  ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Legend interactivity : highlight concerned elements
+  legendNonTransformedLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
+
+  legendQualityOKLink.append("polygon")
+    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+    .style("stroke", d3.rgb(LINKS_COLORS[0]))
+    .style("stroke-width", "2px")
+    .style("opacity", 0.6)
+    .style("fill", d3.rgb(LINKS_COLORS[0]));
+
+  legendQualityOKLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
+
+  legendQualityKOLink.append("polygon")
+    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+    .style("stroke", d3.rgb(LINKS_COLORS[1]))
+    .style("stroke-width", "2px")
+    .style("opacity", 0.6)
+    .style("fill", d3.rgb(LINKS_COLORS[1]));
+
+  legendQualityKOLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
+
+  legendQualityNOLink.append("polygon")
+    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+    .style("stroke", d3.rgb(LINKS_COLORS[2]))
+    .style("stroke-width", "2px")
+    .style("opacity", 0.6)
+    .style("fill", d3.rgb(LINKS_COLORS[2]));
+
+  legendQualityNOLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
+
+  legendQualityNALink.append("polygon")
+    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+    .style("stroke", d3.rgb(LINKS_COLORS[3]))
+    .style("stroke-width", "2px")
+    .style("opacity", 0.6)
+    .style("fill", d3.rgb(LINKS_COLORS[3]));
+
+  legendQualityNALink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
+
+    // 4 - Interactivity
+  
+  var nonCalculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && !( d.iscalculated ) ) ;}),
+      calculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && ( d.iscalculated ) ) ;});
+
+  var linkBetweenApps = link.filter(function (l){return l.linktype == "informationsystem";}),
+      linkBetweenVariablesAndApps = link.filter(function (l){return l.linktype == "variable";});
+
+  var collectionInformationSystems = node.filter(function (d){ return ( ( d.type === "informationsystem" ) && ( eliminateStepStringError(d.etape) == "Saisie / Collecte" ) ) ;}),
+      aggregationInformationSystems = node.filter(function (d){ return ( ( d.type === "informationsystem" ) && ( eliminateStepStringError(d.etape) == "Agregation" ) ) ;}),
+      restitutionInformationSystems = node.filter(function (d){ return ( ( d.type === "informationsystem" ) && ( eliminateStepStringError(d.etape) == "Restitution" ) ) ;});
+
+  var automaticLinks = linkBetweenApps.filter(function (d){ return (d.controlnature == 1);}),
+      semiAutomaticLinks = linkBetweenApps.filter(function (d){ return (d.controlnature == 2);}),
+      manualLinks = linkBetweenApps.filter(function (d){ return (d.controlnature == 3);}),
+      transformedLinks = linkBetweenVariablesAndApps.filter(function (d){ return d.istransformed;}),
+      nonTransformedLinks = linkBetweenVariablesAndApps.filter(function (d){ return !(d.istransformed);}),
+      qualityOKLinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 1);}),
+      qualityKOLinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 2);}),
+      qualityNOLinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 3);}),
+      qualityNALinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 4);});
+
   function restoreVariableNode(type){
-    var shape;
-    if ( type == "Variable élémentaire"){
-      nodeVariableElementary.select("polygon")
-        .style("stroke", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
-        .style("fill", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
-    }
-    else {
-      nodeVariableCalculated.select("circle")
-        .style("stroke", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
-        .style("fill", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
+    switch (type) {
+      case "Variable élémentaire":
+        nonCalculatedVariables
+          .select("polygon")
+          .style("stroke", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;})
+          .style("fill", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;});
+        break;
+      case "Variable calculée":
+        calculatedVariables
+        .select("circle")
+        .style("stroke", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;})
+        .style("fill", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;});
+        break;
     }
   }
 
-  function restoreInformationSystems(type){
-    // if ( type == )
+  function restoreInformationSystemNode(type){
+    switch (type) {
+      case "SI de collecte":
+        collectionInformationSystems
+          .select("rect")
+          .style("stroke", function (d){return d3.rgb(colorScale_OUTLINES(eliminateStepStringError(d.etape)));})
+        break;
+      case "SI d'aggrégation":
+        aggregationInformationSystems
+        .select("rect")
+        .style("stroke", function (d){return d3.rgb(colorScale_OUTLINES(eliminateStepStringError(d.etape)));})
+        break;
+      case "SI de restitution":
+        restitutionInformationSystems
+        .select("rect")
+        .style("stroke", function (d){return d3.rgb(colorScale_OUTLINES(eliminateStepStringError(d.etape)));})
+        break;
+    }
+  }
+
+  function restoreLink(type){
+    var currentLinkCollection;
+    switch (type) {
+      case "Transformée à cette étape":
+        currentLinkCollection = transformedLinks;
+        break;
+      case "Non-transformée à cette étape":
+       currentLinkCollection =  nonTransformedLinks;
+        break;
+      case "Vérification automatique":
+        currentLinkCollection = automaticLinks;
+        break;
+      case "Vérification semi-automatique":
+        currentLinkCollection = semiAutomaticLinks;
+        break;
+      case "Vérification manuelle":
+        currentLinkCollection = manualLinks;
+        break;
+      case "Contrôle OK":
+        currentLinkCollection = qualityOKLinks;
+        break;
+      case "Contrôle KO":
+        currentLinkCollection = qualityKOLinks;
+        break;
+      case "Pas de contrôle":
+        currentLinkCollection = qualityNOLinks;
+        break;
+      case "Pas d'information":
+        currentLinkCollection = qualityNALinks;
+        break;
+    }
+    currentLinkCollection
+        .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
+        .style("stroke-dasharray", function (d){ return (d.dash || "");})
+        .style("stroke", function (d){
+          var color;
+          if (d.linktype == "variable") {
+            color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
+          } else {
+            color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+          }
+          return color;
+        });
   }
 
   legendElementaryVariables.on("mouseenter", function (){
     nodeVariableElementary.select("polygon")
       .attr("fill", "black")
-      .style("stroke", "FFFF00")
-      .style("stroke-WIDTH", "4px")
-  })
+      .style("stroke", "yellow")
+      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+  });
 
   legendCalculatedVariables.on("mouseenter", function (){
     nodeVariableCalculated.select("circle")
       .attr("fill", "black")
-      .style("stroke", "FFFF00")
-      .style("stroke-WIDTH", "4px")
-  })
+      .style("stroke", "yellow")
+      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+  });
 
-  legendElementaryVariables.on("mouseleave", function (l){
-    restoreVariableNode("Variable élémentaire");
-  })
+  legendCollectInformationSystems.on("mouseenter", function (){
+    collectionInformationSystems.select("rect")
+      .style("stroke", "yellow")
+      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+  });
 
-  legendCalculatedVariables.on("mouseleave", function (l){
-    restoreVariableNode("Variable calculée");
-  })
+  legendAgregationInformationSystems.on("mouseenter", function (){
+    aggregationInformationSystems.select("rect")
+      .style("stroke", "yellow")
+      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+  });
 
-  // add interactivity to IS
+  legendRestitutionInformationSystems.on("mouseenter", function (){
+    restitutionInformationSystems.select("rect")
+      .style("stroke", "yellow")
+      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+  });
 
+  legendAutomaticLink.on("mouseenter", function (){
+    automaticLinks
+      .style("stroke", "yellow")
+  });
 
-  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  legendSemiAutomaticLink.on("mouseenter", function (){
+    semiAutomaticLinks
+      .style("stroke", "yellow")
+  });
+
+  legendManualLink.on("mouseenter", function (){
+    manualLinks
+      .style("stroke", "yellow")
+  });
+
+  legendTransformedLink.on("mouseenter", function (){
+    transformedLinks
+      .style("stroke", "yellow")
+  });
+
+  legendNonTransformedLink.on("mouseenter", function (){
+    nonTransformedLinks
+      .style("stroke", "yellow")
+  });
+
+  legendQualityOKLink.on("mouseenter", function (){
+    qualityOKLinks
+      .style("stroke", "yellow")
+  });
+
+  legendQualityKOLink.on("mouseenter", function (){
+    qualityKOLinks
+      .style("stroke", "yellow")
+  });
+
+  legendQualityNOLink.on("mouseenter", function (){
+    qualityNOLinks
+      .style("stroke", "yellow")
+  });
+
+  legendQualityNALink.on("mouseenter", function (){
+    qualityNALinks
+      .style("stroke", "yellow")
+  });
+
+  legendElementaryVariables.on("mouseleave", function (l){restoreVariableNode("Variable élémentaire");});
+
+  legendCalculatedVariables.on("mouseleave", function (l){restoreVariableNode("Variable calculée");});
+
+  legendCollectInformationSystems.on("mouseleave", function (l){restoreInformationSystemNode("SI de collecte");});
+
+  legendAgregationInformationSystems.on("mouseleave", function (l){restoreInformationSystemNode("SI d'aggrégation");});
+
+  legendRestitutionInformationSystems.on("mouseleave", function (l){restoreInformationSystemNode("SI de restitution");});
+
+  legendAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification automatique");});
+
+  legendSemiAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification semi-automatique");});
+
+  legendManualLink.on("mouseleave", function (l){restoreLink("Vérification manuelle");});
+
+  legendTransformedLink.on("mouseleave", function (l){restoreLink("Transformée à cette étape");});
+
+  legendNonTransformedLink.on("mouseleave", function (l){restoreLink("Non-transformée à cette étape");});
+
+  legendQualityOKLink.on("mouseleave", function (l){restoreLink("Contrôle OK");});
+
+  legendQualityKOLink.on("mouseleave", function (l){restoreLink("Contrôle KO");});
+
+  legendQualityNOLink.on("mouseleave", function (l){restoreLink("Pas de contrôle");});
+
+  legendQualityNALink.on("mouseleave", function (l){restoreLink("Pas d'information");});
+
 }
 
 function launchDataVizModuleForAppView() {
 
-  var vizData = { WIDTH : 1000, nbMaximumNodes : 1000, defaultWidth : 85, defaultHeight : 60};
+  var vizData = {WIDTH : WIDTH, nbMaximumNodes: 1000};
   var NodesCharacteristicsForAppView = applicativeViewTransform(NodesAndLinksForAppView[0], NodesAndLinksForAppView[1], vizData);
-  var IS_COLORS = [];
-  var IS_NUMBERS = []; 
   var legendData = NodesCharacteristicsForAppView[2];
-  for (var i = 0; i < vizData.informationSystems.length; i++){ IS_NUMBERS.push(i+1); IS_COLORS.push(IS_COLORS_STOCK[i]);}; 
-  isColorScale = d3.scale.ordinal().domain(vizData.informationSystems).range(IS_COLORS);
+  var nodes = NodesCharacteristicsForAppView[0];
+  var links = NodesCharacteristicsForAppView[1];
+
+  createColorSets(vizData.informationSystems);
+
   biHiSankeyAppView = d3.Sankey_AppView();
-  // Set the biHiSankeyAppView diagram properties
+
+  pathAppView = biHiSankeyAppView.link().curvature(LINK_CURVATURE);
+  
   biHiSankeyAppView
     .legendData(legendData)
     .informationSystems(vizData.informationSystems)
     .nodeWidth(NODE_WIDTH)
-    .nodeSpacing(10)
-    .linkSpacing(4)
+    .nodeSpacing(NODE_SPACING)
+    .linkSpacing(LINK_SPACING)
     .arrowheadScaleFactor(0.5) // Specifies that 0.5 of the link's stroke WIDTH should be allowed for the marker at the end of the link.
-    .size([WIDTH, HEIGHT]);
-
-  pathAppView = biHiSankeyAppView.link().curvature(0.45);
-  biHiSankeyAppView
-    .nodes(NodesCharacteristicsForAppView[0])
-    .links(NodesCharacteristicsForAppView[1])
-    //.nodes([{"Application" : "Picasso", "name": "First node", "type" : "Elémentaire", "id" : "1", "originid" : "1"}, {"Application" : "Fermat", "name": "Second node", "type" : "Calculée", "id" : "2", "originid" : "2"}, {"Application" : "Fermat", "name": "Third node", "type": "Calculée", "id" : "3", "originid" : "3"}])
-    //.links([{"source": "1", "target": "2", "value": "1", "type": "type1"}, {"source": "2", "target" : "3", "value" : "1", "type": "type2"}])
+    .size([WIDTH, HEIGHT])
+    .nodes(nodes)
+    .links(links)
     .initializeNodes(function (node) {
       node.state = node.parent ? "contained" : "collapsed";
     }) // initializeNodes calling 6 functions, generating temporary variables used for display 
     .layout(LAYOUT_INTERATIONS); // layout calls 6 functions, including one which computing default x and y positions.
+
   disableUserInterractions(2 * TRANSITION_DURATION);
   updateAppView();
+
 }
-
-
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Path view
 
 function updatePathView(){
 
+  var link, linkEnter, node, nodeEnter, collapser, collapserEnter, legend;
+  
   function dragmove(node) {
     node.x = Math.max(0, Math.min(WIDTH - node.width, d3.event.x));
     node.y = Math.max(0, Math.min(HEIGHT - node.height, d3.event.y));
     d3.select(this).attr("transform", "translate(" + node.x + "," + node.y + ")");
     biHiSankeyPathView.relayout();
-    svgPathView.selectAll(".node").selectAll("rect").attr("height", function (d) { return d.height; });
-    link.attr("d", pathPathView);
+    svgAppView.selectAll(".node").selectAll("rect").attr("height", function (d) { return d.height; });
+    link.attr("d", pathAppView);
   }
 
   function containChildren(node) {
-      node.children.forEach(function (child) {
-        child.state = "contained";
-        child.parent = this;
-        child._parent = null;
-        containChildren(child);
-      }, node);
+    node.children.forEach(function (child) {
+      child.state = "contained";
+      child.parent = this;
+      child._parent = null;
+      containChildren(child);
+    }, node);
   }
 
   function expand(node) {
@@ -1010,43 +1244,6 @@ function updatePathView(){
     containChildren(node);
   }
 
-  function restoreLinksAndNodes() {
-    link
-      .style("marker-end", function (d) { if ( d.source == "variable"){ return 'url(#arrowVerticalHead)';} else { return 'url(#arrowHorizontalHead)';} }) //return 'url(#arrowHead)'; })
-      .transition()
-        .duration(TRANSITION_DURATION)
-        .style("opacity", OPACITY.LINK_DEFAULT);
-
-    node.filter(function (d){ if ( d.type === "variable" ){return true;}})
-      .selectAll("rect")
-      .style("fill", function (d) {
-        d.color = colorScale(d.type.replace(/ .*/, ""));
-        return d.color;
-      })
-      .style("stroke", function (d) {
-        return d3.rgb(colorScale(d.type.replace(/ .*/, ""))).darker(0.1);
-      })
-      .style("fill-opacity", OPACITY.NODE_DEFAULT)
-      .attr("width", NODE_WIDTH)
-      .attr("height", NODE_HEIGHT);
-
-    node.filter(function (d){ if (d.type === "informationsystem"){return true;}})
-      .selectAll("rect")
-      .style("fill", function (d) {
-        //d.color = colorScale(d.type.replace(/ .*/, ""));
-        d.color = isColorScale(d.name);
-        return d.color;
-      })
-      // .style("stroke", function (d) {
-      //   return d3.rgb(colorScale(d.type.replace(/ .*/, ""))).darker(0.1);
-      // })
-      .style("fill-opacity", OPACITY.NODE_DEFAULT)
-      .attr("width", NODE_INFORMATIONSYSTEM_WIDTH)
-      .attr("height", NODE_INFORMATIONSYSTEM_HEIGHT);
-  }
-
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Nodes
   function computePolygonCoordonates(radius){
     // Function to be called inside function to draw polygon (svg)
     // Returns hexagone local coordinates starting from top left corner, in string form to be used with SVG
@@ -1065,24 +1262,126 @@ function updatePathView(){
     cornersString = cornersString + corners[5][0].toString() + "," + corners[5][1].toString();
     return cornersString;
   }
-  var node, nodeEnter;
-  node = svgPathView.select("#nodes").selectAll(".node")
-      .data(biHiSankeyPathView.collapsedNodes(), function (d) { return d.id; });
+
+  function computeLinkPolygonCoordonates(height, width){
+    // Function used to compute polygon coordonates
+    // Returns link local coordinates starting from top left corner, in string form to be used with SVG
+    var corners = [], cornersString = "";
+    corners.push([ 0, - height/2]);
+    corners.push([ 0.85*width, -height/2]);
+    corners.push([ width, 0]);
+    corners.push([ 0.85*width, height/2]);
+    corners.push([ 0,  height/2]);
+    
+    for (var i = 0; i != 4; i++){
+      cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
+    }
+    cornersString = cornersString + corners[4][0].toString() + "," + corners[4][1].toString();
+    return cornersString;
+  }
+
+  function restoreLinksAndNodes() {
+    link
+      .style("stroke-WIDTH", function (d) { return Math.max(1, d.thickness); })
+      .style("stroke-dasharray", function (d){ return (d.dash || "");})
+      .style("stroke", function (d){
+        var color;
+        if (d.linktype == "variable") {
+          color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
+        } else {
+          color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+        }
+        return color;
+      })
+      .style("marker-end", function (d) { if ( d.source == "variable"){ return 'url(#arrowVerticalHead)';} else { return 'url(#arrowHorizontalHead)';} }) //return 'url(#arrowHead)'; })
+      .transition()
+        .duration(TRANSITION_DURATION)
+        .style("opacity", OPACITY.LINK_DEFAULT);
+
+    node.filter(function (d){ if ( d.type === "variable" ){return true;}})
+      .selectAll("rect")
+      .style("fill", function (d) {
+        d.color = colorScale_NODES(d.informationsystem);
+        return d.color;
+      })
+      .style("fill-opacity", OPACITY.NODE_DEFAULT)
+      .attr("width", NODE_WIDTH)
+      .attr("height", NODE_HEIGHT);
+
+    node.filter(function (d){ if (d.type === "informationsystem"){return true;}})
+      .selectAll("rect")
+      .style("fill", function (d) {
+        d.color = colorScale_NODES(d.name);
+        return d.color;
+      })
+      .style("fill-opacity", OPACITY.NODE_DEFAULT)
+      .attr("width", NODE_INFORMATIONSYSTEM_WIDTH)
+      .attr("height", NODE_INFORMATIONSYSTEM_HEIGHT);
+  }
+
+  link = svgPathView.select("#links").selectAll("path.link").data(biHiSankeyPathView.visibleLinks(), function (d) { return d.id; });
+
+  link.exit().remove();
+
+  link.transition()
+    .duration(TRANSITION_DURATION)
+    .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
+    .style("stroke-dasharray", function (d){ return (d.dash || "");})
+    .style("stroke", function (d){
+      var color;
+      color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+      return color;
+    })
+    .attr("d", pathAppView)
+    .style("opacity", OPACITY.LINK_DEFAULT);
+
+
+  linkEnter = link.enter().append("path")
+    .attr("class", "link")
+    .style("fill", function (d){return "white"});
+
+
+  // To include link type dependancy for arrowhead : marker-head
+  linkEnter.sort(function (a, b) { return b.thickness - a.thickness; })
+    .classed("leftToRight", function (d) {
+      return d.direction > 0;
+    })
+    .classed("rightToLeft", function (d) {
+      return d.direction < 0;
+    })
+    .style("marker-end", function (d) {
+      // return 'url(#arrowHead)';
+      if (d.source.type == "variable"){
+        return 'url(#arrowVerticalHead)';
+      } 
+      else{
+        return 'url(#arrowHorizontalHead)';
+      }
+    })
+    .style("stroke", function (d){
+      var color;
+      color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+      return color;
+    })
+    .style("opacity", 0)
+    .transition()
+      .delay(TRANSITION_DURATION)
+      .duration(TRANSITION_DURATION)
+      .attr("d", pathPathView)
+      .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
+      .style("stroke-dasharray", function (d){ return (d.dash || "");})
+      .style("stroke", function (d){
+        var color;
+        color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+        return color;
+      })
+      .style("opacity", OPACITY.LINK_DEFAULT);
+
+  node = svgPathView.select("#nodes").selectAll(".node").data(biHiSankeyPathView.collapsedNodes(), function (d) { return d.id; });
 
   node.transition()
     .duration(TRANSITION_DURATION)
-    .attr("transform", function (d) { return "translate(" + d.x + "," + d.y + ")"; })
-    .style("opacity", OPACITY.NODE_DEFAULT)
-    .select("rect")
-      .style("fill", function (d) {
-        d.color = colorScale(d.type.replace(/ .*/, ""));
-        return d.color;
-      })
-      .style("stroke", function (d) { return d3.rgb(colorScale(d.type.replace(/ .*/, ""))).darker(0.1); })
-      .style("stroke-WIDTH", "1px")
-      .attr("height", function (d) { return NODE_HEIGHT; })
-      .attr("width", biHiSankeyPathView.nodeWidth());
-
+    .attr("transform", function (d) { return "translate(" + d.x + "," + d.y + ")"; });
 
   node.exit()
     .transition()
@@ -1113,40 +1412,53 @@ function updatePathView(){
 
   nodeEnter.append("text");
 
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Version 2 where variables are appended a circle and information systems are appended a rectangle
-  function threeStepFunction(value, listValues){
-    if ( value == 0){
-      return 1;
-    }
-    if ( ( 1 <= value ) && ( value < listValues.length - 1) ) {
-      return 2;
-    }
-    if ( value == listValues.length - 1){
-      return 3;
-    }
-  }
+  // Create Variable Nodes
 
-  var nodeVariable = node.filter(function (d){ return d.type === "variable";});
   var nodeVariableCalculated = node.filter(function (d){ return ( ( d.type === "variable" ) && ( d.iscalculated ) ) ;});
-  var nodeVariableElementary = node.filter(function (d){ return ( ( d.type === "variable" ) && ( ! d.iscalculated ) ) ;});
-  nodeVariableCalculated.append("circle")
-    .style("fill", function (d){d.color = isColorScale(d.informationsystem); return d.color;})
-    .attr("r", NODE_HEIGHT / 2);
 
+  nodeVariableCalculated
+    .append("circle")
+    .attr("r", NODE_HEIGHT / 2)
+    .style("fill", function (d) {
+      d.color = colorScale_NODES(d.informationsystem);
+      return d.color;
+    })
+    .style("fill-opacity", OPACITY.NODE_DEFAULT);
 
-  nodeVariableElementary.append("polygon")       // attach a polygon
-    .style("stroke", "black")  // colour the line
-    .style("stroke-WIDTH", "1px")
-    .style("fill",  function (d){ d.color = isColorScale(d.informationsystem); return d.color;})
-    //.style("fill", function (d){d.color = colorScale(d.type.replace(/ .*/, "")); return d.color;})     // remove any fill colour
-    .attr("points", function (d){  return computePolygonCoordonates(NODE_HEIGHT/2); } );  // x,y points 
-  
-  node.on("mouseenter", function (g) {
+  nodeVariableCalculated.select("text")
+    .attr("x", function (d) {return (5/2)*d.name.length;})
+    .attr("y", function (d) {return d.height / 2 + 10 ;})
+    .attr("dy", "1.5em")
+    .attr("text-anchor", "end")
+    .attr("transform", null)
+    .text(function (d) { return d.name; });
+
+  var nodeVariableElementary = node.filter(function (d){ return ( ( d.type === "variable" ) && !( d.iscalculated ) ) ;});
+
+  nodeVariableElementary
+    .append("polygon")       // attach a polygon
+    .attr("points", function (d){  return computePolygonCoordonates(NODE_HEIGHT/2); } )
+    .style("fill", function (d) {
+      d.color = colorScale_NODES(d.informationsystem);
+      return d.color;
+    })
+    .style("fill-opacity", OPACITY.NODE_DEFAULT);
+
+  nodeVariableElementary.select("text")
+    .attr("x", function (d) {return (5/2)*d.name.length;})
+    .attr("y", function (d) {return d.height / 2 + 10 ;})
+    .attr("dy", "1.5em")
+    .attr("text-anchor", "end")
+    .attr("transform", null)
+    .text(function (d) { return d.name; });
+
+  // Create and attach tooltips
+
+  nodeVariableElementary.on("mouseenter", function (g) {
     if (!isTransitioning) {
       // highlightConnected(g);
-      restoreLinksAndNodes();
-      tooltipAppView
+      // restoreLinksAndNodes();
+      tooltipPathView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
@@ -1154,18 +1466,19 @@ function updatePathView(){
           .style("opacity", 1).select(".value")
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
-          
+            var reverseControlQuality = CONTROL_QUALITY[g.controlquality - 1];
+            var reverseControlNature = CONTROL_NATURE[g.controlnature - 1]; 
+            debugger;
+            return g.table + "\n" + "SI " + g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
           });
     }
   });
 
-  // Mouse enter event used for information system and variable viz
-  node.on("mouseenter", function (g) {
+  nodeVariableCalculated.on("mouseenter", function (g) {
     if (!isTransitioning) {
       // highlightConnected(g);
-      restoreLinksAndNodes();
-      tooltipAppView
+      // restoreLinksAndNodes();
+      tooltipPathView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
@@ -1173,14 +1486,16 @@ function updatePathView(){
           .style("opacity", 1).select(".value")
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
+            var reverseControlQuality = CONTROL_QUALITY[g.controlquality - 1];
+            var reverseControlNature = CONTROL_NATURE[g.controlnature - 1]; 
+            return g.table + "\n" + "SI " +  g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
           });
     }
   });
 
   node.on("mouseleave", function () {
     if (!isTransitioning) {
-      hideAppTooltip();
+      hidePathTooltip();
       restoreLinksAndNodes();
     }
   });
@@ -1188,241 +1503,337 @@ function updatePathView(){
   node.filter(function (d) { return d.children.length; })
     .on("dblclick", showHidePathChildren);
 
-  // allow nodes to be dragged to new positions
   node.call(d3.behavior.drag()
     .origin(function (d) { return d; })
     .on("dragstart", function () { this.parentNode.appendChild(this); })
     .on("drag", dragmove));
 
-  nodeVariable.select("text")
-    .attr("x", function (d) {return (5/2)*d.name.length;})
-    .attr("y", function (d) {return NODE_HEIGHT ;})
+  // Create and attach legend
+
+  var legend = svgPathView.select("#legend").selectAll(".legend").data(biHiSankeyPathView.legendData(), function (l) { return l.id; }); // intermediate
+
+  var legendEnter = legend.enter().append("g")
+                      .attr("class", "legend")
+                      .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";})
+
+  var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );}),
+      legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );}),
+      legendAutomaticLink = legend.filter(function (l){ return l.text == "Vérification automatique";}),
+      legendSemiAutomaticLink = legend.filter(function (l){ return l.text == "Vérification semi-automatique";}),
+      legendManualLink = legend.filter(function (l){ return l.text == "Vérification manuelle"}),
+      legendQualityOKLink = legend.filter(function (l){ return l.text == "Contrôle OK"}),
+      legendQualityKOLink = legend.filter(function (l){ return l.text == "Contrôle KO"}),
+      legendQualityNOLink = legend.filter(function (l){ return l.text == "Pas de contrôle"}),
+      legendQualityNALink = legend.filter(function (l){ return l.text == "Pas d'information"});
+
+    // 1 - Elementary / Calculated variables
+  legendElementaryVariables.append("polygon")
+    .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } )
+    .style("stroke", "black")  // colour the line
+    .style("stroke-width", "1px")
+    .style("fill", "#FFFFFF");
+
+  legendElementaryVariables.append("text")
+    .attr("x", function (d) {return "20px";})
+    .attr("y", function (d) {return 0;})
     .attr("dy", ".35em")
-    .attr("text-anchor", "end")
+    .attr("text-anchor", "start")
     .attr("transform", null)
-    .text(function (d) { return d.name; });
+    .text(function (d) { return d.text; });
 
-  ///////////////////////////////////////////////////////////////////////////////////////////////////////
-  // Links
-  var link, linkEnter;
-  link = svgPathView.select("#links").selectAll("path.link")
-    .data(biHiSankeyPathView.visibleLinks(), function (d) { return d.id; });
+  legendCalculatedVariables.append("circle")
+    .attr("fill", " #FFFFFF")
+    .attr("r", NODE_WIDTH/2)
+    .style("stroke", "black")
+    .style("stroke-width", "1px");
 
-  link.exit().remove();
+  legendCalculatedVariables.append("text")
+    .attr("x", function (d) {return "20px";})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
-  linkEnter = link.enter().append("path")
-    .attr("class", "link")
-    .style("fill", function (d){return "white"; /*typeColorScale(d.controlquality);*/})
-    .style("stroke", function (d){return typeColorScale(d.controlquality);}) // colour the line
-    .style("stroke-dasharray", function (d){ return d.dash || "";})
+    // 3 - Links
+  legendAutomaticLink.append("polygon")
+    .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )
+    .style("stroke", LINK_DEFAULT_COLOR)
+    .style("stroke-width", "2px")
+    .style("fill", LINK_DEFAULT_COLOR);
 
-  var linkAutomatedControl = link.filter(function (l){ return l.controlnature == 1;});
-  var linkSemiAutomatic = link.filter(function (l) { return l.controlnature == 2;});
-  var linkManual = link.filter(function (l){ return l.controlnature == 3;});
+  legendAutomaticLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
+  legendSemiAutomaticLink.append("line")
+    .attr("x1", function(d) {return 0;})
+    .attr("y1", function(d) {return 0;})
+    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+    .attr("y2", function(d) {return 0;})
+    .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
+    .style("stroke-width", "2px")
+    .style("fill", LINK_DEFAULT_COLOR);
 
-  linkManual
-    .attr({"stroke-dasharray": "5,5"});
+  legendSemiAutomaticLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
+  legendManualLink.append("line")
+    .attr("x1", function(d) {return 0;})
+    .attr("y1", function(d) {return 0;})
+    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+    .attr("y2", function(d) {return 0;})
+    .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
+    .style("stroke-width", "2px")
+    .style("stroke-dasharray", "5,5")
+    .style("fill", LINK_DEFAULT_COLOR);
 
+  legendManualLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
-  // To include link type dependancy for arrowhead : marker-head
-  linkEnter.sort(function (a, b) { return b.thickness - a.thickness; })
-    .classed("leftToRight", function (d) {
-      return d.direction > 0;
-    })
-    .classed("rightToLeft", function (d) {
-      return d.direction < 0;
-    })
-    .style("marker-end", function (d) {
-      // return 'url(#arrowHead)';
-      if (d.source.type == "variable"){
-        return 'url(#arrowVerticalHead)';
-      } 
-      else{
-        return 'url(#arrowHorizontalHead)';
-      }
-    })
-    //.style("stroke", LINK_COLOR)
-    .transition()
-      .delay(TRANSITION_DURATION)
-      .duration(TRANSITION_DURATION)
-      .attr("d", pathPathView)
-      .style("stroke-WIDTH", function (d) { return Math.max(1, d.thickness); })
-      .style("opacity", OPACITY.LINK_DEFAULT);
+  legendQualityOKLink.append("polygon")
+    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+    .style("stroke", d3.rgb(LINKS_COLORS[0]))
+    .style("stroke-width", "2px")
+    .style("opacity", 0.6)
+    .style("fill", d3.rgb(LINKS_COLORS[0]));
 
+  legendQualityOKLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Legend part
-    // var legend = svgPathView.select("#links").selectAll("path.link")
-    //                     .data(biHiSankeyAppView.legendData, function (d) { return d.id; });;
+  legendQualityKOLink.append("polygon")
+    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+    .style("stroke", d3.rgb(LINKS_COLORS[1]))
+    .style("stroke-width", "2px")
+    .style("opacity", 0.6)
+    .style("fill", d3.rgb(LINKS_COLORS[1]));
 
-    // var legendEnter = legend.enter().append("g")
-    //                   .attr("class", "legend")
-    //                   .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";})
+  legendQualityKOLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
-    // var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );});
-    // var legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );});
-    // var legendAutomaticLink = legend.filter(function (l){ return l.text == "Vérification automatique";});
-    // var legendSemiAutomaticLink = legend.filter(function (l){ return l.text == "Vérification semi-automatique";});
-    // var legendManualLink = legend.filter(function (l){ return l.text == "Vérification manuelle"});
-    // // var legendLinkAutomatic = legend.filter( function (l) { return l.type == "automaticlink"});
-    // // var legendLinkSemiAutomatic = legend.filter( function (l) { return l.type == "semiautomatic"})
-    // // 1 - Elementary variables
-    // legendElementaryVariables.append("polygon") 
-    //   .style("stroke", "black")  // colour the line
-    //   .style("stroke-WIDTH", "2px")
-    //   .style("fill", "#FFFFFF")
-    //   .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } );  // x,y points 
+  legendQualityNOLink.append("polygon")
+    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+    .style("stroke", d3.rgb(LINKS_COLORS[2]))
+    .style("stroke-width", "2px")
+    .style("opacity", 0.6)
+    .style("fill", d3.rgb(LINKS_COLORS[2]));
 
-    // legendElementaryVariables.append("text")
-    //   .attr("x", function (d) {return "20px";})
-    //   .attr("y", function (d) {return 0;})
-    //   .attr("dy", ".35em")
-    //   .attr("text-anchor", "start")
-    //   .attr("transform", null)
-    //   .text(function (d) { return d.text; });
+  legendQualityNOLink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
-    // // 2 - Calculated variables
-    // legendCalculatedVariables.append("circle")
-    //   .style("stroke", "black")
-    //   .style("stroke-WIDTH", "2px")
-    //   .attr("fill", " #FFFFFF")
-    //   .attr("r", NODE_WIDTH/2)
+  legendQualityNALink.append("polygon")
+    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+    .style("stroke", d3.rgb(LINKS_COLORS[3]))
+    .style("stroke-width", "2px")
+    .style("opacity", 0.6)
+    .style("fill", d3.rgb(LINKS_COLORS[3]));
 
-    // legendCalculatedVariables.append("text")
-    //   .attr("x", function (d) {return "20px";})
-    //   .attr("y", function (d) {return 0;})
-    //   .attr("dy", ".35em")
-    //   .attr("text-anchor", "start")
-    //   .attr("transform", null)
-    //   .text(function (d) { return d.text; });
+  legendQualityNALink.append("text")
+    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+    .attr("y", function (d) {return 0;})
+    .attr("dy", ".35em")
+    .attr("text-anchor", "start")
+    .attr("transform", null)
+    .text(function (d) { return d.text; });
 
-    // // 3 - Information systems
-    // legendCollectInformationSystems.append("rect")
-    //   .style("stroke", strokeColorScale(1))
-    //   .style("stroke-WIDTH", "2px")
-    //   .attr("fill", "#FFFFFF")
-    //   .attr("x", function(d) {return "8px";})
-    //   .attr("y", function(d) {return -NODE_WIDTH/2;})
-    //   .attr("width", NODE_HEIGHT/2)
-    //   .attr("height", NODE_WIDTH)
+    // 4 - Interactivity
+  
+  var nonCalculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && !( d.iscalculated ) ) ;}),
+      calculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && ( d.iscalculated ) ) ;});
 
-    // legendCollectInformationSystems.append("text")
-    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
-    //   .attr("y", function (d) {return 0;})
-    //   .attr("dy", ".35em")
-    //   .attr("text-anchor", "start")
-    //   .attr("transform", null)
-    //   .text(function (d) { return d.text; });  
+  var automaticLinks = link.filter(function (d){ return (d.controlnature == 1);}),
+      semiAutomaticLinks = link.filter(function (d){ return (d.controlnature == 2);}),
+      manualLinks = link.filter(function (d){ return (d.controlnature == 3);}),
+      qualityOKLinks = link.filter(function (d){ return (d.controlquality == 1);}),
+      qualityKOLinks = link.filter(function (d){ return (d.controlquality == 2);}),
+      qualityNOLinks = link.filter(function (d){ return (d.controlquality == 3);}),
+      qualityNALinks = link.filter(function (d){ return (d.controlquality == 4);});
 
+  function restoreVariableNode(type){
+    switch (type) {
+      case "Variable élémentaire":
+        nonCalculatedVariables
+          .select("polygon")
+          .style("stroke", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;})
+          .style("fill", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;});
+        break;
+      case "Variable calculée":
+        calculatedVariables
+        .select("circle")
+        .style("stroke", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;})
+        .style("fill", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;});
+        break;
+    }
+  }
 
-    // legendAgregationInformationSystems.append("rect")
-    //   .style("stroke", strokeColorScale(2))
-    //   .style("stroke-WIDTH", "2px")
-    //   .attr("fill", "#FFFFFF")
-    //   .attr("x", function(d) {return "8px";})
-    //   .attr("y", function(d) {return -NODE_WIDTH/2;})
-    //   .attr("width", NODE_HEIGHT/2)
-    //   .attr("height", NODE_WIDTH)
+  function restoreLink(type){
+    var currentLinkCollection;
+    switch (type) {
+      case "Vérification automatique":
+        currentLinkCollection = automaticLinks;
+        break;
+      case "Vérification semi-automatique":
+        currentLinkCollection = semiAutomaticLinks;
+        break;
+      case "Vérification manuelle":
+        currentLinkCollection = manualLinks;
+        break;
+      case "Contrôle OK":
+        currentLinkCollection = qualityOKLinks;
+        break;
+      case "Contrôle KO":
+        currentLinkCollection = qualityKOLinks;
+        break;
+      case "Pas de contrôle":
+        currentLinkCollection = qualityNOLinks;
+        break;
+      case "Pas d'information":
+        currentLinkCollection = qualityNALinks;
+        break;
+    }
+    currentLinkCollection
+        .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
+        .style("stroke-dasharray", function (d){ return (d.dash || "");})
+        .style("stroke", function (d){
+          var color;
+          if (d.linktype == "variable") {
+            color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
+          } else {
+            color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+          }
+          return color;
+        });
+  }
 
-    // legendAgregationInformationSystems.append("text")
-    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
-    //   .attr("y", function (d) {return 0;})
-    //   .attr("dy", ".35em")
-    //   .attr("text-anchor", "start")
-    //   .attr("transform", null)
-    //   .text(function (d) { return d.text; });  
+  legendElementaryVariables.on("mouseenter", function (){
+    nodeVariableElementary.select("polygon")
+      .attr("fill", "black")
+      .style("stroke", "yellow")
+      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+  });
 
-    // legendRestitutionInformationSystems.append("rect")
-    //   .style("stroke", strokeColorScale(3))
-    //   .style("stroke-WIDTH", "2px")
-    //   .attr("fill", "#FFFFFF")
-    //   .attr("x", function(d) {return "8px";})
-    //   .attr("y", function(d) {return -NODE_WIDTH/2;})
-    //   .attr("width", NODE_HEIGHT/2)
-    //   .attr("height", NODE_WIDTH)
+  legendCalculatedVariables.on("mouseenter", function (){
+    nodeVariableCalculated.select("circle")
+      .attr("fill", "black")
+      .style("stroke", "yellow")
+      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+  });
 
-    // legendRestitutionInformationSystems.append("text")
-    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 19;})
-    //   .attr("y", function (d) {return 0;})
-    //   .attr("dy", ".35em")
-    //   .attr("text-anchor", "start")
-    //   .attr("transform", null)
-    //   .text(function (d) { return d.text; });  
+  legendAutomaticLink.on("mouseenter", function (){
+    automaticLinks
+      .style("stroke", "yellow")
+  });
 
-    // legendAutomaticLink.append("text")
-    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    //   .attr("y", function (d) {return 0;})
-    //   .attr("dy", ".35em")
-    //   .attr("text-anchor", "start")
-    //   .attr("transform", null)
-    //   .text(function (d) { return d.text; });
+  legendSemiAutomaticLink.on("mouseenter", function (){
+    semiAutomaticLinks
+      .style("stroke", "yellow")
+  });
 
-    // legendAutomaticLink.append("polygon")
-    //   .style("stroke", "#a6d854")  // colour the line
-    //   .style("stroke-WIDTH", "2px")
-    //   .style("fill", "#a6d854")
-    //   .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
+  legendManualLink.on("mouseenter", function (){
+    manualLinks
+      .style("stroke", "yellow")
+  });
 
-    // legendSemiAutomaticLink.append("text")
-    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    //   .attr("y", function (d) {return 0;})
-    //   .attr("dy", ".35em")
-    //   .attr("text-anchor", "start")
-    //   .attr("transform", null)
-    //   .text(function (d) { return d.text; });
+  legendQualityOKLink.on("mouseenter", function (){
+    qualityOKLinks
+      .style("stroke", "yellow")
+  });
 
-    // legendSemiAutomaticLink.append("polygon")
-    //   .style("stroke", "#fc8d62")  // colour the line
-    //   .style("stroke-WIDTH", "2px")
-    //   .style("fill", "#fc8d62")
-    //   .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
+  legendQualityKOLink.on("mouseenter", function (){
+    qualityKOLinks
+      .style("stroke", "yellow")
+  });
 
-    // legendManualLink.append("text")
-    //   .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    //   .attr("y", function (d) {return 0;})
-    //   .attr("dy", ".35em")
-    //   .attr("text-anchor", "start")
-    //   .attr("transform", null)
-    //   .text(function (d) { return d.text; });
+  legendQualityNOLink.on("mouseenter", function (){
+    qualityNOLinks
+      .style("stroke", "yellow")
+  });
 
-    // legendManualLink.append("polygon")
-    //   .style("stroke", "#8da0cb")  // colour the line
-    //   .style("stroke-WIDTH", "2px")
-    //   .style("fill", "#8da0cb")
-    //   .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/2); } )  // x,y points 
+  legendQualityNALink.on("mouseenter", function (){
+    qualityNALinks
+      .style("stroke", "yellow")
+  });
+
+  legendElementaryVariables.on("mouseleave", function (l){restoreVariableNode("Variable élémentaire");});
+
+  legendCalculatedVariables.on("mouseleave", function (l){restoreVariableNode("Variable calculée");});
+
+  legendAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification automatique");});
+
+  legendSemiAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification semi-automatique");});
+
+  legendManualLink.on("mouseleave", function (l){restoreLink("Vérification manuelle");});
+
+  legendQualityOKLink.on("mouseleave", function (l){restoreLink("Contrôle OK");});
+
+  legendQualityKOLink.on("mouseleave", function (l){restoreLink("Contrôle KO");});
+
+  legendQualityNOLink.on("mouseleave", function (l){restoreLink("Pas de contrôle");});
+
+  legendQualityNALink.on("mouseleave", function (l){restoreLink("Pas d'information");});
+
 }
 
 function launchDataVizModuleForPathView() {
 
-  var vizData = {'nbMaximumNodes' : 1000, 'defaultWidth' : 85, 'defaultHeight' : 60};
+  var vizData = {WIDTH : WIDTH, nbMaximumNodes: 1000};
   var NodesCharacteristicsForPathView = pathViewTransform(NodesAndLinksForPathView[0], NodesAndLinksForPathView[1], vizData);
-  var IS_COLORS = [];
-  var IS_NUMBERS = []; 
-  //var legendData = NodesCharacteristics[2];
-  for (var i = 0; i < vizData.informationSystems.length; i++){ IS_NUMBERS.push(i+1); IS_COLORS.push(IS_COLORS_STOCK[i]);}; 
-  isColorScale = d3.scale.ordinal().domain(vizData.informationSystems).range(IS_COLORS);
+  var legendData = NodesCharacteristicsForPathView[2];
+  var nodes = NodesCharacteristicsForPathView[0];
+  var links = NodesCharacteristicsForPathView[1];
+
+  createColorSets(vizData.informationSystems);
+
   biHiSankeyPathView = d3.Sankey_PathView();
-  // Set the biHiSankeyPathView diagram properties
+
+  pathPathView = biHiSankeyPathView.link().curvature(LINK_CURVATURE);
+  
   biHiSankeyPathView
+    .legendData(legendData)
     .informationSystems(vizData.informationSystems)
     .nodeWidth(NODE_WIDTH)
-    .nodeSpacing(10)
-    .linkSpacing(4)
+    .nodeSpacing(NODE_SPACING)
+    .linkSpacing(LINK_SPACING)
     .arrowheadScaleFactor(0.5) // Specifies that 0.5 of the link's stroke WIDTH should be allowed for the marker at the end of the link.
-    .size([WIDTH, HEIGHT]);
-
-  pathPathView = biHiSankeyPathView.link().curvature(0.45);
-  biHiSankeyPathView
-    .nodes(NodesCharacteristicsForPathView[0])
-    .links(NodesCharacteristicsForPathView[1])
-    //.nodes([{"Application" : "Picasso", "name": "First node", "type" : "Elémentaire", "id" : "1", "originid" : "1"}, {"Application" : "Fermat", "name": "Second node", "type" : "Calculée", "id" : "2", "originid" : "2"}, {"Application" : "Fermat", "name": "Third node", "type": "Calculée", "id" : "3", "originid" : "3"}])
-    //.links([{"source": "1", "target": "2", "value": "1", "type": "type1"}, {"source": "2", "target" : "3", "value" : "1", "type": "type2"}])
+    .size([WIDTH, HEIGHT])
+    .nodes(nodes)
+    .links(links)
     .initializeNodes(function (node) {
       node.state = node.parent ? "contained" : "collapsed";
     }) // initializeNodes calling 6 functions, generating temporary variables used for display 
     .layout(LAYOUT_INTERATIONS); // layout calls 6 functions, including one which computing default x and y positions.
+
   disableUserInterractions(2 * TRANSITION_DURATION);
   updatePathView();
+
 }
+

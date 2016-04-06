@@ -17,7 +17,12 @@ d3.Sankey_PathView = function () {
     xScaleFactor = 0.5,
     yScaleFactor = 0.5,
     defaultLinkCurvature = 0.5,
-    informationSystems;
+    WIDTH = 1100,
+    HORIZONTAL_OFFSET = 150,
+    VERTICAL_OFFSET = 250,
+    VERTICAL_INCREMENT = 70,
+    informationSystems,
+    legendData;
 
   function center(node) {
     return node.y + node.height / 2;
@@ -318,8 +323,12 @@ d3.Sankey_PathView = function () {
       .entries(nodes)
       .map(function (object) { return object.values; });
     // Attribute x coordonates depending on the information system of the variable
-    var positionsByInformationSystem = [100, 300, 425, 550, 675, 875, 1100, 1400];
-    nodesByInformationSystem.forEach( function (nodes,i){ nodes.forEach(function (n) { n.width = nodeWidth; n.x = positionsByInformationSystem[i]; }) } );
+    nodesByInformationSystem.forEach( function (nodes,i) { 
+      nodes.forEach(function (n) {
+        n.width = nodeWidth;
+        n.x = HORIZONTAL_OFFSET + i*WIDTH/(nodesByInformationSystem.length+3);
+      })
+    });
   }
 
   function computeLeftAndRightLinks() {
@@ -345,7 +354,7 @@ d3.Sankey_PathView = function () {
 
   function adjustTop(adjustment) {
     nodes.forEach(function (node) {
-      node.y -= adjustment;
+      node.y += adjustment;
     });
   }
 
@@ -416,9 +425,9 @@ d3.Sankey_PathView = function () {
       // nodesByInformationSystem.forEach( function (nodes,i){ nodes.forEach(function (n) { n.y = 100 + 600*Math.random(); }) } );
       // nodes.forEach( function (node) { node.y = 100 + 500*Math.random();});
       nodesByXPosition.forEach(function (nodes) {
-      nodes.forEach(function (node, i) {
-      node.y = 100*i;
-      node.heightAllowance = node.value * yScaleFactor + linkSpacing * node.linkSpaceCount;
+        nodes.forEach(function (node, i) {
+          node.y = VERTICAL_INCREMENT*i;
+          node.heightAllowance = node.value * yScaleFactor + linkSpacing * node.linkSpaceCount;
         });
       });
     }
@@ -434,6 +443,15 @@ d3.Sankey_PathView = function () {
         }
       });
     } 
+
+    function calculateLinkDash() {
+      links.forEach(function (link) {
+        //link.thickness = link.value * yScaleFactor;
+        if (link.controlnature == 3){
+          link.dash = "10,10";
+        }
+      });
+    }
 
     function relaxLeftToRight(alpha) {
       function weightedSource(link) {
@@ -511,6 +529,7 @@ d3.Sankey_PathView = function () {
     // calculateYScaleFactor();
     initializeNodeYPosition();
     calculateLinkThickness();
+    calculateLinkDash();
     // resolveCollisions();
 
     for (alpha = 1; iterations > 0; --iterations) {
@@ -521,7 +540,7 @@ d3.Sankey_PathView = function () {
       resolveCollisions();
     }
 
-    minY = d3.min(nodes, function (node) { return node.y; });
+    minY = VERTICAL_OFFSET; /*d3.min(nodes, function (node) { return node.y; });*/
     adjustTop(minY);
   }
 
@@ -727,6 +746,13 @@ d3.Sankey_PathView = function () {
     nodes.forEach(callback);
     return biHiSankey;
   };
+
+  biHiSankey.legendData = function (_){
+    if (!arguments.length){ return legendData; }
+    legendData = _;
+    return biHiSankey;
+  }
+
 
   biHiSankey.informationSystems = function (_) {
     if ( !arguments.length ){ return informationSystems;}
