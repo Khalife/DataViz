@@ -3,6 +3,10 @@
 var svgAppView, svgPathView, tooltipAppView, tooltipPathView, biHiSankeyAppView, biHiSankeyPathView,
     pathAppView, pathPathView, defs, colorScale_NODES, colorScale_OUTLINES, colorScale_LINKS, isTransitioning;
 
+var NodesCharacteristicsForAppView, NodesCharacteristicsForPathView;
+
+var tabsDOMElement = [].slice.call( document.querySelectorAll( '.tabs > nav > ul > li' ) );
+
 var OPACITY = {
     NODE_DEFAULT: 0.9,
     NODE_FADED: 0.1,
@@ -127,56 +131,59 @@ showPathLinkTooltip = function (s, t) {
     .transition()
       .duration(TRANSITION_DURATION)
       .style("opacity", 1);
+},
+
+hideParents = function (node) {
+  if(node.parent) {
+    node.parent.visible = false;
+    hideParents(node.parent);
+    hideSiblings(node);
+  }
+},
+
+hideSiblings = function (node) {
+  if(node.parent.children) {
+    node.parent.children.filter(function(n) {return n != node})
+      .forEach(function(sibling) {
+        sibling.visible = false;
+        hideChildren(sibling);
+      });
+  }
+},
+
+hideChildren = function (node) {
+  if(node.children) {
+    node.children
+      .forEach(function(child) {
+        child.visible = false;
+        hideChildren(child);
+      });
+  }
+},
+
+resetPathViewVisibility = function() {
+  var nodesPathView = NodesCharacteristicsForPathView[0];
+  nodesPathView.forEach(function(node) {
+    node.visible = true;
+    node.status = "open";
+  });
+  biHiSankeyPathView.relayout();
+  updatePathView();
+},
+
+getListOfIdsOfChildren = function (node, initialList){
+    node.children.forEach(function (child) {
+      initialList.push(child.id);
+      getListOfIdsOfChildren(child, initialList);
+    });
+},
+
+getListOfIdsOfAncestors = function (node, initialList){
+    node.ancestors.forEach(function (parent){
+      initialList.push(parent.id);
+      getListOfIdsOfAncestors(parent, initialList);
+    });
 };
-
-
-function howHideAppChildren(node) {
-  disableUserInterractions(2 * TRANSITION_DURATION);
-  hideAppTooltip();
-  if (node.state === "collapsed") { expand(node); }
-  else { collapse(node); }
-
-  biHiSankeyAppView.relayout();
-  updateAppView();
-  link.attr("d", pathAppView);
-  restoreLinksAndNodes();
-}
-
-function howHidePathChildren(node) {
-  disableUserInterractions(2 * TRANSITION_DURATION);
-  hideAppTooltip();
-  if (node.state === "collapsed") { expand(node); }
-  else { collapse(node); }
-
-  biHiSankeyAppView.relayout();
-  updateAppView();
-  link.attr("d", pathAppView);
-  restoreLinksAndNodes();
-}
-
-function showHideAppChildren(node){
-  disableUserInterractions(2 * TRANSITION_DURATION);
-  hidePathTooltip();
-  if (node.state === "collapsed") { expand(node);}
-  else { collapse(node); }
-
-  biHiSankeyPathView.relayout();
-  updatePathView();
-  link.attr("d", pathAppView);
-  restoreLinksAndNodes();
-}
-
-function showHidePathChildren(node){
-  disableUserInterractions(2 * TRANSITION_DURATION);
-  hidePathTooltip();
-  if (node.state === "collapsed") { expand(node);}
-  else { collapse(node); }
-
-  biHiSankeyPathView.relayout();
-  updatePathView();
-  link.attr("d", pathAppView);
-  restoreLinksAndNodes();
-}
 
 // Define color sets
 
@@ -186,6 +193,8 @@ function createColorSets(informationSystems) {
   colorScale_OUTLINES = d3.scale.ordinal().domain(OUTLINES_TYPES).range(OUTLINES_COLORS);
   colorScale_LINKS = d3.scale.ordinal().domain(LINKS_TYPES).range(LINKS_COLORS);
 }
+
+
 
 // End color sets
 
@@ -331,6 +340,7 @@ defs.append("marker")
   .append("path")
     .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
+d3.select("#chart-path").append("a").on("click", resetPathViewVisibility).text("|reset|");
 
 function updateAppView () {
   
@@ -352,6 +362,20 @@ function updateAppView () {
       child._parent = null;
       containChildren(child);
     }, node);
+  }
+
+  function open(node) {
+    node.status = "open";
+    node.children.forEach(function (child) {
+      child.visible = true;
+    });
+  }
+
+  function close(node) {
+    node.status = "closed";
+    node.children.forEach(function (child) {
+      child.visible = false;
+    });
   }
 
   function expand(node) {
@@ -405,23 +429,25 @@ function updateAppView () {
     return cornersString;
   }
 
-  function threeStepFunction(value, listValues){
-    if ( value == 0){
-      return 1;
-    }
-    if ( ( 1 <= value ) && ( value < listValues.length - 1) ) {
-      return 2;
-    }
-    if ( value == listValues.length - 1){
-      return 3;
-    }
-  }
-
   function eliminateStepStringError(etapeString){
     if (etapeString == "Agrégation"){
       return "Agregation";
     }
     return etapeString;
+  }
+
+  function showHideAppChildren(node) {
+    disableUserInterractions(2 * TRANSITION_DURATION);
+    hideAppTooltip();
+    if (node.status === "open") { close(node) } else { open(node) };
+    
+    // if (node.state === "collapsed") { expand(node); }
+    // else { collapse(node); }
+
+    biHiSankeyAppView.relayout();
+    updateAppView();
+    link.attr("d", pathAppView);
+    restoreLinksAndNodes();
   }
 
   function restoreLinksAndNodes() {
@@ -530,7 +556,7 @@ function updateAppView () {
       })
       .style("opacity", OPACITY.LINK_DEFAULT);
 
-  node = svgAppView.select("#nodes").selectAll(".node").data(biHiSankeyAppView.collapsedNodes(), function (d) { return d.id; });
+  node = svgAppView.select("#nodes").selectAll(".node").data(biHiSankeyAppView.visibleNodes(), function (d) { return d.id; });
 
   node.transition()
     .duration(TRANSITION_DURATION)
@@ -654,8 +680,6 @@ function updateAppView () {
 
   nodeVariableElementary.on("mouseenter", function (g) {
     if (!isTransitioning) {
-      // highlightConnected(g);
-      // restoreLinksAndNodes();
       tooltipAppView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
@@ -666,7 +690,6 @@ function updateAppView () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
             var reverseControlQuality = g.controlqualitytext;
             var reverseControlNature = g.controlnaturetext; 
-            // return g.table + "\n" + "SI " + g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
             return "Table : \n" + g.table + "\n \n" + "Champs : \n" + g.champs + "\n \n" + "Contrôle effectué : \n" + reverseControlQuality + "\n \n" +"Nature du contrôle : \n" + reverseControlNature; 
           });
     }
@@ -674,8 +697,6 @@ function updateAppView () {
 
   nodeVariableCalculated.on("mouseenter", function (g) {
     if (!isTransitioning) {
-      // highlightConnected(g);
-      // restoreLinksAndNodes();
       tooltipAppView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
@@ -686,7 +707,6 @@ function updateAppView () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
             var reverseControlQuality = g.controlqualitytext;
             var reverseControlNature = g.controlnaturetext; 
-            // return g.table + "\n" + "SI " +  g.informationsystem + "\n"  + reverseControlQuality + "\n" + reverseControlNature;
             return "Table : \n" + g.table + "\n \n" + "Champs : \n" + g.champs + "\n \n" + "Contrôle effectué : \n" + reverseControlQuality + "\n \n" + "Nature du contrôle : \n" + reverseControlNature; 
           });
     }
@@ -703,12 +723,10 @@ function updateAppView () {
           .style("opacity", 1).select(".value")
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            // return g.name + "\nNet flow: " + formatFlow(g.netFlow) + additionalInstructions  + " X = " + g.x + " , Y = " + g.y ;
             return "Equipe :\n" + g.equipe + "\n \n" + "Responsable : \n" + g.responsable ;
           });
     }
   });
-
 
   node.on("mouseleave", function () {
     if (!isTransitioning) {
@@ -720,6 +738,11 @@ function updateAppView () {
   node.filter(function (d) { return d.children.length; })
     .on("dblclick", showHideAppChildren);
 
+  node.filter(function (d) { return ( d.type == "variable" ) })
+    .on("dblclick", function(e) {
+      transferToPathView(e);
+    });
+
   node.call(d3.behavior.drag()
     .origin(function (d) { return d; })
     .on("dragstart", function () { this.parentNode.appendChild(this); })
@@ -727,471 +750,476 @@ function updateAppView () {
 
   // Create and attach legend
 
-  legend = svgAppView.select("#legend").selectAll(".legend").data(biHiSankeyAppView.legendData(), function (l) { return l.id; }); // intermediate
-
-  var legendEnter = legend.enter().append("g")
-                      .attr("class", "legend")
-                      .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";})
-
-  var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );}),
-      legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );}),
-      legendCollectInformationSystems = legend.filter(function (l){ return (l.text == "SI de collecte");}),
-      legendAgregationInformationSystems = legend.filter(function (l){ return (l.text == "SI d'aggrégation");}),
-      legendRestitutionInformationSystems = legend.filter(function (l){ return (l.text == "SI de restitution");}),
-      legendAutomaticLink = legend.filter(function (l){ return l.text == "Vérification automatique";}),
-      legendSemiAutomaticLink = legend.filter(function (l){ return l.text == "Vérification semi-automatique";}),
-      legendManualLink = legend.filter(function (l){ return l.text == "Vérification manuelle"}),
-      legendTransformedLink = legend.filter(function (l){ return l.text == "Transformée à cette étape"}),
-      legendNonTransformedLink = legend.filter(function (l){ return l.text == "Non-transformée à cette étape"}),
-      legendQualityOKLink = legend.filter(function (l){ return l.text == "Contrôle OK"}),
-      legendQualityKOLink = legend.filter(function (l){ return l.text == "Contrôle KO"}),
-      legendQualityNOLink = legend.filter(function (l){ return l.text == "Pas de contrôle"}),
-      legendQualityNALink = legend.filter(function (l){ return l.text == "Pas d'information"});
-
-    // 1 - Elementary / Calculated variables
-  legendElementaryVariables.append("polygon")
-    .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } )
-    .style("stroke", "black")  // colour the line
-    .style("stroke-width", "1px")
-    .style("fill", "#FFFFFF");
-
-  legendElementaryVariables.append("text")
-    .attr("x", function (d) {return "20px";})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-  legendCalculatedVariables.append("circle")
-    .attr("fill", " #FFFFFF")
-    .attr("r", NODE_WIDTH/2)
-    .style("stroke", "black")
-    .style("stroke-width", "1px");
-
-  legendCalculatedVariables.append("text")
-    .attr("x", function (d) {return "20px";})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-    // 2 - Information systems
-  legendCollectInformationSystems.append("rect")
-    .attr("fill", "#FFFFFF")
-    .attr("x", function(d) {return 0;})
-    .attr("y", function(d) {return -NODE_WIDTH/2;})
-    .attr("width", NODE_HEIGHT)
-    .attr("height", NODE_WIDTH)
-    .style("stroke", colorScale_OUTLINES("Saisie / Collecte"))
-    .style("stroke-width", "2px");
-
-  legendCollectInformationSystems.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });  
-
-  legendAgregationInformationSystems.append("rect")
-    .attr("fill", "#FFFFFF")
-    .attr("x", function(d) {return 0;})
-    .attr("y", function(d) {return -NODE_WIDTH/2;})
-    .attr("width", NODE_HEIGHT)
-    .attr("height", NODE_WIDTH)
-    .style("stroke", colorScale_OUTLINES("Aggregation"))
-    .style("stroke-width", "2px");
-
-  legendAgregationInformationSystems.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });  
-
-  legendRestitutionInformationSystems.append("rect")
-    .attr("fill", "#FFFFFF")
-    .attr("x", function(d) {return 0;})
-    .attr("y", function(d) {return -NODE_WIDTH/2;})
-    .attr("width", NODE_HEIGHT)
-    .attr("height", NODE_WIDTH)
-    .style("stroke", colorScale_OUTLINES("Restitution"))
-    .style("stroke-width", "2px")
-
-  legendRestitutionInformationSystems.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });  
-
-    // 3 - Links
-  legendAutomaticLink.append("polygon")
-    .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )
-    .style("stroke", LINK_DEFAULT_COLOR)
-    .style("stroke-width", "2px")
-    .style("fill", LINK_DEFAULT_COLOR);
-
-  legendAutomaticLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-  legendSemiAutomaticLink.append("line")
-    .attr("x1", function(d) {return 0;})
-    .attr("y1", function(d) {return 0;})
-    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
-    .attr("y2", function(d) {return 0;})
-    .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
-    .style("stroke-width", "2px")
-    .style("fill", LINK_DEFAULT_COLOR);
-
-  legendSemiAutomaticLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-  legendManualLink.append("line")
-    .attr("x1", function(d) {return 0;})
-    .attr("y1", function(d) {return 0;})
-    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
-    .attr("y2", function(d) {return 0;})
-    .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
-    .style("stroke-width", "2px")
-    .style("stroke-dasharray", "5,5")
-    .style("fill", LINK_DEFAULT_COLOR);
-
-  legendManualLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-  legendTransformedLink.append("line")
-    .attr("x1", function(d) {return 0;})
-    .attr("y1", function(d) {return 0;})
-    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
-    .attr("y2", function(d) {return 0;})
-    .style("stroke", d3.rgb(LINKS_COLORS[4]))  // colour the line
-    .style("stroke-width", "2px")
-    .style("opacity", 0.6)
-    .style("fill", d3.rgb(LINKS_COLORS[4]));
-
-  legendTransformedLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-  legendNonTransformedLink.append("line")
-    .attr("x1", function(d) {return 0;})
-    .attr("y1", function(d) {return 0;})
-    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
-    .attr("y2", function(d) {return 0;})
-    .style("stroke", d3.rgb(LINKS_COLORS[5]))  // colour the line
-    .style("stroke-width", "2px")
-    .style("opacity", 0.6)
-    .style("fill", d3.rgb(LINKS_COLORS[5]));
-
-  legendNonTransformedLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-  legendQualityOKLink.append("polygon")
-    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
-    .style("stroke", d3.rgb(LINKS_COLORS[0]))
-    .style("stroke-width", "2px")
-    .style("opacity", 0.6)
-    .style("fill", d3.rgb(LINKS_COLORS[0]));
-
-  legendQualityOKLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-  legendQualityKOLink.append("polygon")
-    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
-    .style("stroke", d3.rgb(LINKS_COLORS[1]))
-    .style("stroke-width", "2px")
-    .style("opacity", 0.6)
-    .style("fill", d3.rgb(LINKS_COLORS[1]));
-
-  legendQualityKOLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-  legendQualityNOLink.append("polygon")
-    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
-    .style("stroke", d3.rgb(LINKS_COLORS[2]))
-    .style("stroke-width", "2px")
-    .style("opacity", 0.6)
-    .style("fill", d3.rgb(LINKS_COLORS[2]));
-
-  legendQualityNOLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-  legendQualityNALink.append("polygon")
-    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
-    .style("stroke", d3.rgb(LINKS_COLORS[3]))
-    .style("stroke-width", "2px")
-    .style("opacity", 0.6)
-    .style("fill", d3.rgb(LINKS_COLORS[3]));
-
-  legendQualityNALink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
-
-    // 4 - Interactivity
+  var legend = svgAppView.select("#legend").selectAll(".legend");
   
-  var nonCalculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && !( d.iscalculated ) ) ;}),
-      calculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && ( d.iscalculated ) ) ;});
+  if (legend[0].length == 0) {
 
-  var linkBetweenApps = link.filter(function (l){return l.linktype == "informationsystem";}),
-      linkBetweenVariablesAndApps = link.filter(function (l){return l.linktype == "variable";});
+    legend = legend.data(biHiSankeyAppView.legendData(), function (l) { return l.id; }); // intermediate
 
-  var collectionInformationSystems = node.filter(function (d){ return ( ( d.type === "informationsystem" ) && ( eliminateStepStringError(d.etape) == "Saisie / Collecte" ) ) ;}),
-      aggregationInformationSystems = node.filter(function (d){ return ( ( d.type === "informationsystem" ) && ( eliminateStepStringError(d.etape) == "Agregation" ) ) ;}),
-      restitutionInformationSystems = node.filter(function (d){ return ( ( d.type === "informationsystem" ) && ( eliminateStepStringError(d.etape) == "Restitution" ) ) ;});
+    var legendEnter = legend.enter()
+                        .append("g")
+                          .attr("class", "legend")
+                          .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";});
 
-  var automaticLinks = linkBetweenApps.filter(function (d){ return (d.controlnature == 1);}),
-      semiAutomaticLinks = linkBetweenApps.filter(function (d){ return (d.controlnature == 2);}),
-      manualLinks = linkBetweenApps.filter(function (d){ return (d.controlnature == 3);}),
-      transformedLinks = linkBetweenVariablesAndApps.filter(function (d){ return d.istransformed;}),
-      nonTransformedLinks = linkBetweenVariablesAndApps.filter(function (d){ return !(d.istransformed);}),
-      qualityOKLinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 1);}),
-      qualityKOLinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 2);}),
-      qualityNOLinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 3);}),
-      qualityNALinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 4);});
+    var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );}),
+        legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );}),
+        legendCollectInformationSystems = legend.filter(function (l){ return (l.text == "SI de collecte");}),
+        legendAgregationInformationSystems = legend.filter(function (l){ return (l.text == "SI d'aggrégation");}),
+        legendRestitutionInformationSystems = legend.filter(function (l){ return (l.text == "SI de restitution");}),
+        legendAutomaticLink = legend.filter(function (l){ return l.text == "Vérification automatique";}),
+        legendSemiAutomaticLink = legend.filter(function (l){ return l.text == "Vérification semi-automatique";}),
+        legendManualLink = legend.filter(function (l){ return l.text == "Vérification manuelle"}),
+        legendTransformedLink = legend.filter(function (l){ return l.text == "Transformée à cette étape"}),
+        legendNonTransformedLink = legend.filter(function (l){ return l.text == "Non-transformée à cette étape"}),
+        legendQualityOKLink = legend.filter(function (l){ return l.text == "Contrôle OK"}),
+        legendQualityKOLink = legend.filter(function (l){ return l.text == "Contrôle KO"}),
+        legendQualityNOLink = legend.filter(function (l){ return l.text == "Pas de contrôle"}),
+        legendQualityNALink = legend.filter(function (l){ return l.text == "Pas d'information"});
 
+      // 1 - Elementary / Calculated variables
+    legendElementaryVariables.append("polygon")
+      .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } )
+      .style("stroke", "black")  // colour the line
+      .style("stroke-width", "1px")
+      .style("fill", "#FFFFFF");
 
-  // qualityOKLinks.select("polygon").style("fill", d3.rgb(LINKS_COLORS[3]));
-  function restoreVariableNode(type){
-    switch (type) {
-      case "Variable élémentaire":
-        nonCalculatedVariables
-          .select("polygon")
+    legendElementaryVariables.append("text")
+      .attr("x", function (d) {return "20px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendCalculatedVariables.append("circle")
+      .attr("fill", " #FFFFFF")
+      .attr("r", NODE_WIDTH/2)
+      .style("stroke", "black")
+      .style("stroke-width", "1px");
+
+    legendCalculatedVariables.append("text")
+      .attr("x", function (d) {return "20px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+      // 2 - Information systems
+    legendCollectInformationSystems.append("rect")
+      .attr("fill", "#FFFFFF")
+      .attr("x", function(d) {return 0;})
+      .attr("y", function(d) {return -NODE_WIDTH/2;})
+      .attr("width", NODE_HEIGHT)
+      .attr("height", NODE_WIDTH)
+      .style("stroke", colorScale_OUTLINES("Saisie / Collecte"))
+      .style("stroke-width", "2px");
+
+    legendCollectInformationSystems.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });  
+
+    legendAgregationInformationSystems.append("rect")
+      .attr("fill", "#FFFFFF")
+      .attr("x", function(d) {return 0;})
+      .attr("y", function(d) {return -NODE_WIDTH/2;})
+      .attr("width", NODE_HEIGHT)
+      .attr("height", NODE_WIDTH)
+      .style("stroke", colorScale_OUTLINES("Aggregation"))
+      .style("stroke-width", "2px");
+
+    legendAgregationInformationSystems.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });  
+
+    legendRestitutionInformationSystems.append("rect")
+      .attr("fill", "#FFFFFF")
+      .attr("x", function(d) {return 0;})
+      .attr("y", function(d) {return -NODE_WIDTH/2;})
+      .attr("width", NODE_HEIGHT)
+      .attr("height", NODE_WIDTH)
+      .style("stroke", colorScale_OUTLINES("Restitution"))
+      .style("stroke-width", "2px")
+
+    legendRestitutionInformationSystems.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });  
+
+      // 3 - Links
+    legendAutomaticLink.append("polygon")
+      .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )
+      .style("stroke", LINK_DEFAULT_COLOR)
+      .style("stroke-width", "2px")
+      .style("fill", LINK_DEFAULT_COLOR);
+
+    legendAutomaticLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendSemiAutomaticLink.append("line")
+      .attr("x1", function(d) {return 0;})
+      .attr("y1", function(d) {return 0;})
+      .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+      .attr("y2", function(d) {return 0;})
+      .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
+      .style("stroke-width", "4px")
+      .style("fill", LINK_DEFAULT_COLOR);
+
+    legendSemiAutomaticLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendManualLink.append("line")
+      .attr("x1", function(d) {return 0;})
+      .attr("y1", function(d) {return 0;})
+      .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+      .attr("y2", function(d) {return 0;})
+      .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
+      .style("stroke-width", "4px")
+      .style("stroke-dasharray", "5,5")
+      .style("fill", LINK_DEFAULT_COLOR);
+
+    legendManualLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendTransformedLink.append("line")
+      .attr("x1", function(d) {return 0;})
+      .attr("y1", function(d) {return 0;})
+      .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+      .attr("y2", function(d) {return 0;})
+      .style("stroke", d3.rgb(LINKS_COLORS[4]))  // colour the line
+      .style("stroke-width", "1px")
+      .style("opacity", 0.6)
+      .style("fill", d3.rgb(LINKS_COLORS[4]));
+
+    legendTransformedLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendNonTransformedLink.append("line")
+      .attr("x1", function(d) {return 0;})
+      .attr("y1", function(d) {return 0;})
+      .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+      .attr("y2", function(d) {return 0;})
+      .style("stroke", d3.rgb(LINKS_COLORS[5]))  // colour the line
+      .style("stroke-width", "1px")
+      .style("opacity", 0.6)
+      .style("fill", d3.rgb(LINKS_COLORS[5]));
+
+    legendNonTransformedLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendQualityOKLink.append("polygon")
+      .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+      .style("stroke", d3.rgb(LINKS_COLORS[0]))
+      .style("stroke-width", "2px")
+      .style("opacity", 0.6)
+      .style("fill", d3.rgb(LINKS_COLORS[0]));
+
+    legendQualityOKLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendQualityKOLink.append("polygon")
+      .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+      .style("stroke", d3.rgb(LINKS_COLORS[1]))
+      .style("stroke-width", "2px")
+      .style("opacity", 0.6)
+      .style("fill", d3.rgb(LINKS_COLORS[1]));
+
+    legendQualityKOLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendQualityNOLink.append("polygon")
+      .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+      .style("stroke", d3.rgb(LINKS_COLORS[2]))
+      .style("stroke-width", "2px")
+      .style("opacity", 0.6)
+      .style("fill", d3.rgb(LINKS_COLORS[2]));
+
+    legendQualityNOLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendQualityNALink.append("polygon")
+      .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+      .style("stroke", d3.rgb(LINKS_COLORS[3]))
+      .style("stroke-width", "2px")
+      .style("opacity", 0.6)
+      .style("fill", d3.rgb(LINKS_COLORS[3]));
+
+    legendQualityNALink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+      // 4 - Interactivity
+    
+    var nonCalculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && !( d.iscalculated ) ) ;}),
+        calculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && ( d.iscalculated ) ) ;});
+
+    var linkBetweenApps = link.filter(function (l){return l.linktype == "informationsystem";}),
+        linkBetweenVariablesAndApps = link.filter(function (l){return l.linktype == "variable";});
+
+    var collectionInformationSystems = node.filter(function (d){ return ( ( d.type === "informationsystem" ) && ( eliminateStepStringError(d.etape) == "Saisie / Collecte" ) ) ;}),
+        aggregationInformationSystems = node.filter(function (d){ return ( ( d.type === "informationsystem" ) && ( eliminateStepStringError(d.etape) == "Agregation" ) ) ;}),
+        restitutionInformationSystems = node.filter(function (d){ return ( ( d.type === "informationsystem" ) && ( eliminateStepStringError(d.etape) == "Restitution" ) ) ;});
+
+    var automaticLinks = linkBetweenApps.filter(function (d){ return (d.controlnature == 1);}),
+        semiAutomaticLinks = linkBetweenApps.filter(function (d){ return (d.controlnature == 2);}),
+        manualLinks = linkBetweenApps.filter(function (d){ return (d.controlnature == 3);}),
+        transformedLinks = linkBetweenVariablesAndApps.filter(function (d){ return d.istransformed;}),
+        nonTransformedLinks = linkBetweenVariablesAndApps.filter(function (d){ return !(d.istransformed);}),
+        qualityOKLinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 1);}),
+        qualityKOLinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 2);}),
+        qualityNOLinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 3);}),
+        qualityNALinks = linkBetweenApps.filter(function (d){ return (d.controlquality == 4);});
+
+    function restoreVariableNode(type){
+      switch (type) {
+        case "Variable élémentaire":
+          nonCalculatedVariables
+            .select("polygon")
+            .style("stroke", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;})
+            .style("fill", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;});
+          break;
+        case "Variable calculée":
+          calculatedVariables
+          .select("circle")
           .style("stroke", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;})
           .style("fill", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;});
-        break;
-      case "Variable calculée":
-        calculatedVariables
-        .select("circle")
-        .style("stroke", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;})
-        .style("fill", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;});
-        break;
+          break;
+      }
     }
-  }
 
-  function restoreInformationSystemNode(type){
-    switch (type) {
-      case "SI de collecte":
-        collectionInformationSystems
+    function restoreInformationSystemNode(type){
+      switch (type) {
+        case "SI de collecte":
+          collectionInformationSystems
+            .select("rect")
+            .style("stroke", function (d){return d3.rgb(colorScale_OUTLINES(eliminateStepStringError(d.etape)));})
+          break;
+        case "SI d'aggrégation":
+          aggregationInformationSystems
           .select("rect")
           .style("stroke", function (d){return d3.rgb(colorScale_OUTLINES(eliminateStepStringError(d.etape)));})
-        break;
-      case "SI d'aggrégation":
-        aggregationInformationSystems
-        .select("rect")
-        .style("stroke", function (d){return d3.rgb(colorScale_OUTLINES(eliminateStepStringError(d.etape)));})
-        break;
-      case "SI de restitution":
-        restitutionInformationSystems
-        .select("rect")
-        .style("stroke", function (d){return d3.rgb(colorScale_OUTLINES(eliminateStepStringError(d.etape)));})
-        break;
+          break;
+        case "SI de restitution":
+          restitutionInformationSystems
+          .select("rect")
+          .style("stroke", function (d){return d3.rgb(colorScale_OUTLINES(eliminateStepStringError(d.etape)));})
+          break;
+      }
     }
-  }
 
-  function restoreLink(type){
-    var currentLinkCollection;
-    switch (type) {
-      case "Transformée à cette étape":
-        currentLinkCollection = transformedLinks;
-        break;
-      case "Non-transformée à cette étape":
-       currentLinkCollection =  nonTransformedLinks;
-        break;
-      case "Vérification automatique":
-        currentLinkCollection = automaticLinks;
-        break;
-      case "Vérification semi-automatique":
-        currentLinkCollection = semiAutomaticLinks;
-        break;
-      case "Vérification manuelle":
-        currentLinkCollection = manualLinks;
-        break;
-      case "Contrôle OK":
-        currentLinkCollection = qualityOKLinks;
-        break;
-      case "Contrôle KO":
-        currentLinkCollection = qualityKOLinks;
-        break;
-      case "Pas de contrôle":
-        currentLinkCollection = qualityNOLinks;
-        break;
-      case "Pas d'information":
-        currentLinkCollection = qualityNALinks;
-        break;
+    function restoreLink(type){
+      var currentLinkCollection;
+      switch (type) {
+        case "Transformée à cette étape":
+          currentLinkCollection = transformedLinks;
+          break;
+        case "Non-transformée à cette étape":
+         currentLinkCollection =  nonTransformedLinks;
+          break;
+        case "Vérification automatique":
+          currentLinkCollection = automaticLinks;
+          break;
+        case "Vérification semi-automatique":
+          currentLinkCollection = semiAutomaticLinks;
+          break;
+        case "Vérification manuelle":
+          currentLinkCollection = manualLinks;
+          break;
+        case "Contrôle OK":
+          currentLinkCollection = qualityOKLinks;
+          break;
+        case "Contrôle KO":
+          currentLinkCollection = qualityKOLinks;
+          break;
+        case "Pas de contrôle":
+          currentLinkCollection = qualityNOLinks;
+          break;
+        case "Pas d'information":
+          currentLinkCollection = qualityNALinks;
+          break;
+      }
+      currentLinkCollection
+          .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
+          .style("stroke-dasharray", function (d){ return (d.dash || "");})
+          .style("stroke", function (d){
+            var color;
+            if (d.linktype == "variable") {
+              color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
+            } else {
+              color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+            }
+            return color;
+          });
     }
-    currentLinkCollection
-        .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
-        .style("stroke-dasharray", function (d){ return (d.dash || "");})
-        .style("stroke", function (d){
-          var color;
-          if (d.linktype == "variable") {
-            color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
-          } else {
-            color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
-          }
-          return color;
-        });
+
+    legendElementaryVariables.on("mouseenter", function (){
+      nodeVariableElementary.select("polygon")
+        .attr("fill", "black")
+        .style("stroke", "yellow")
+        .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+    });
+
+    legendCalculatedVariables.on("mouseenter", function (){
+      nodeVariableCalculated.select("circle")
+        .attr("fill", "black")
+        .style("stroke", "yellow")
+        .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+    });
+
+    legendCollectInformationSystems.on("mouseenter", function (){
+      collectionInformationSystems.select("rect")
+        .style("stroke", "yellow")
+        .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+    });
+
+    legendAgregationInformationSystems.on("mouseenter", function (){
+      aggregationInformationSystems.select("rect")
+        .style("stroke", "yellow")
+        .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+    });
+
+    legendRestitutionInformationSystems.on("mouseenter", function (){
+      restitutionInformationSystems.select("rect")
+        .style("stroke", "yellow")
+        .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+    });
+
+    legendAutomaticLink.on("mouseenter", function (){
+      automaticLinks
+        .style("stroke", "yellow")
+    });
+
+    legendSemiAutomaticLink.on("mouseenter", function (){
+      semiAutomaticLinks
+        .style("stroke", "yellow")
+    });
+
+    legendManualLink.on("mouseenter", function (){
+      manualLinks
+        .style("stroke", "yellow")
+    });
+
+    legendTransformedLink.on("mouseenter", function (){
+      transformedLinks
+        .style("stroke", "yellow")
+    });
+
+    legendNonTransformedLink.on("mouseenter", function (){
+      nonTransformedLinks
+        .style("stroke", "yellow")
+    });
+
+    legendQualityOKLink.on("mouseenter", function (){
+      qualityOKLinks
+        .style("stroke", "yellow")
+    });
+
+    legendQualityKOLink.on("mouseenter", function (){
+      qualityKOLinks
+        .style("stroke", "yellow")
+    });
+
+    legendQualityNOLink.on("mouseenter", function (){
+      qualityNOLinks
+        .style("stroke", "yellow")
+    });
+
+    legendQualityNALink.on("mouseenter", function (){
+      qualityNALinks
+        .style("stroke", "yellow")
+    });
+
+    legendElementaryVariables.on("mouseleave", function (l){restoreVariableNode("Variable élémentaire");});
+
+    legendCalculatedVariables.on("mouseleave", function (l){restoreVariableNode("Variable calculée");});
+
+    legendCollectInformationSystems.on("mouseleave", function (l){restoreInformationSystemNode("SI de collecte");});
+
+    legendAgregationInformationSystems.on("mouseleave", function (l){restoreInformationSystemNode("SI d'aggrégation");});
+
+    legendRestitutionInformationSystems.on("mouseleave", function (l){restoreInformationSystemNode("SI de restitution");});
+
+    legendAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification automatique");});
+
+    legendSemiAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification semi-automatique");});
+
+    legendManualLink.on("mouseleave", function (l){restoreLink("Vérification manuelle");});
+
+    legendTransformedLink.on("mouseleave", function (l){restoreLink("Transformée à cette étape");});
+
+    legendNonTransformedLink.on("mouseleave", function (l){restoreLink("Non-transformée à cette étape");});
+
+    legendQualityOKLink.on("mouseleave", function (l){restoreLink("Contrôle OK");});
+
+    legendQualityKOLink.on("mouseleave", function (l){restoreLink("Contrôle KO");});
+
+    legendQualityNOLink.on("mouseleave", function (l){restoreLink("Pas de contrôle");});
+
+    legendQualityNALink.on("mouseleave", function (l){restoreLink("Pas d'information");});
+
   }
-
-  legendElementaryVariables.on("mouseenter", function (){
-    nodeVariableElementary.select("polygon")
-      .attr("fill", "black")
-      .style("stroke", "yellow")
-      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
-  });
-
-  legendCalculatedVariables.on("mouseenter", function (){
-    nodeVariableCalculated.select("circle")
-      .attr("fill", "black")
-      .style("stroke", "yellow")
-      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
-  });
-
-  legendCollectInformationSystems.on("mouseenter", function (){
-    collectionInformationSystems.select("rect")
-      .style("stroke", "yellow")
-      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
-  });
-
-  legendAgregationInformationSystems.on("mouseenter", function (){
-    aggregationInformationSystems.select("rect")
-      .style("stroke", "yellow")
-      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
-  });
-
-  legendRestitutionInformationSystems.on("mouseenter", function (){
-    restitutionInformationSystems.select("rect")
-      .style("stroke", "yellow")
-      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
-  });
-
-  legendAutomaticLink.on("mouseenter", function (){
-    automaticLinks
-      .style("stroke", "yellow")
-  });
-
-  legendSemiAutomaticLink.on("mouseenter", function (){
-    semiAutomaticLinks
-      .style("stroke", "yellow")
-  });
-
-  legendManualLink.on("mouseenter", function (){
-    manualLinks
-      .style("stroke", "yellow")
-  });
-
-  legendTransformedLink.on("mouseenter", function (){
-    transformedLinks
-      .style("stroke", "yellow")
-  });
-
-  legendNonTransformedLink.on("mouseenter", function (){
-    nonTransformedLinks
-      .style("stroke", "yellow")
-  });
-
-  legendQualityOKLink.on("mouseenter", function (){
-    qualityOKLinks
-      .style("stroke", "yellow")
-  });
-
-  legendQualityKOLink.on("mouseenter", function (){
-    qualityKOLinks
-      .style("stroke", "yellow")
-  });
-
-  legendQualityNOLink.on("mouseenter", function (){
-    qualityNOLinks
-      .style("stroke", "yellow")
-  });
-
-  legendQualityNALink.on("mouseenter", function (){
-    qualityNALinks
-      .style("stroke", "yellow")
-  });
-
-  legendElementaryVariables.on("mouseleave", function (l){restoreVariableNode("Variable élémentaire");});
-
-  legendCalculatedVariables.on("mouseleave", function (l){restoreVariableNode("Variable calculée");});
-
-  legendCollectInformationSystems.on("mouseleave", function (l){restoreInformationSystemNode("SI de collecte");});
-
-  legendAgregationInformationSystems.on("mouseleave", function (l){restoreInformationSystemNode("SI d'aggrégation");});
-
-  legendRestitutionInformationSystems.on("mouseleave", function (l){restoreInformationSystemNode("SI de restitution");});
-
-  legendAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification automatique");});
-
-  legendSemiAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification semi-automatique");});
-
-  legendManualLink.on("mouseleave", function (l){restoreLink("Vérification manuelle");});
-
-  legendTransformedLink.on("mouseleave", function (l){restoreLink("Transformée à cette étape");});
-
-  legendNonTransformedLink.on("mouseleave", function (l){restoreLink("Non-transformée à cette étape");});
-
-  legendQualityOKLink.on("mouseleave", function (l){restoreLink("Contrôle OK");});
-
-  legendQualityKOLink.on("mouseleave", function (l){restoreLink("Contrôle KO");});
-
-  legendQualityNOLink.on("mouseleave", function (l){restoreLink("Pas de contrôle");});
-
-  legendQualityNALink.on("mouseleave", function (l){restoreLink("Pas d'information");});
 
 }
 
 function launchDataVizModuleForAppView() {
 
   var vizData = {WIDTH : WIDTH, nbMaximumNodes: 1000};
-  var NodesCharacteristicsForAppView = applicativeViewTransform(NodesAndLinksForAppView[0], NodesAndLinksForAppView[1], vizData);
+  NodesCharacteristicsForAppView = applicativeViewTransform(NodesAndLinksForAppView[0], NodesAndLinksForAppView[1], vizData);
   var legendData = NodesCharacteristicsForAppView[2];
   var nodes = NodesCharacteristicsForAppView[0];
   var links = NodesCharacteristicsForAppView[1];
@@ -1213,17 +1241,25 @@ function launchDataVizModuleForAppView() {
     .nodes(nodes)
     .links(links)
     .initializeNodes(function (node) {
-      node.state = node.parent ? "contained" : "collapsed";
+      node.visible = true;
+      node.status = "open";
     }) // initializeNodes calling 6 functions, generating temporary variables used for display 
-    .layout(LAYOUT_INTERATIONS); // layout calls 6 functions, including one which computing default x and y positions.
+    .layout(); // layout calls 6 functions, including one which computing default x and y positions.
 
   disableUserInterractions(2 * TRANSITION_DURATION);
   updateAppView();
 
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Path view
+function transferToPathView(node) {
+  var nodesPathView = NodesCharacteristicsForPathView[0];
+  var currentNodeInPathView = nodesPathView.filter(function(n) { return n.id == node.idFromSource })[0];
+  hideParents(currentNodeInPathView);
+  // hideSiblings(currentNodeInPathView);
+  biHiSankeyPathView.relayout();
+  updatePathView();
+  tabsDOMElement[1].dispatchEvent(new Event('click'));
+}
 
 function updatePathView(){
 
@@ -1245,6 +1281,22 @@ function updatePathView(){
       child._parent = null;
       containChildren(child);
     }, node);
+  }
+
+  function open(node) {
+    node.status = "open";
+    node.children.forEach(function (child) {
+      child.visible = true;
+      open(child);
+    });
+  }
+
+  function close(node) {
+    node.status = "closed";
+    node.children.forEach(function (child) {
+      child.visible = false;
+      close(child);
+    });
   }
 
   function expand(node) {
@@ -1296,6 +1348,20 @@ function updatePathView(){
     }
     cornersString = cornersString + corners[4][0].toString() + "," + corners[4][1].toString();
     return cornersString;
+  }
+
+  function showHidePathChildren(node) {
+    disableUserInterractions(2 * TRANSITION_DURATION);
+    hidePathTooltip();
+    if (node.status === "open") { close(node) } else { open(node) };
+    
+    // if (node.state === "collapsed") { expand(node); }
+    // else { collapse(node); }
+
+    biHiSankeyPathView.relayout();
+    updatePathView();
+    link.attr("d", pathPathView);
+    restoreLinksAndNodes();
   }
 
   function restoreLinksAndNodes() {
@@ -1350,7 +1416,7 @@ function updatePathView(){
       color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
       return color;
     })
-    .attr("d", pathAppView)
+    .attr("d", pathPathView)
     .style("opacity", OPACITY.LINK_DEFAULT);
 
 
@@ -1395,7 +1461,7 @@ function updatePathView(){
       })
       .style("opacity", OPACITY.LINK_DEFAULT);
 
-  node = svgPathView.select("#nodes").selectAll(".node").data(biHiSankeyPathView.collapsedNodes(), function (d) { return d.id; });
+  node = svgPathView.select("#nodes").selectAll(".node").data(biHiSankeyPathView.visibleNodes(), function (d) { return d.id; });
 
   node.transition()
     .duration(TRANSITION_DURATION)
@@ -1474,8 +1540,26 @@ function updatePathView(){
 
   nodeVariableElementary.on("mouseenter", function (g) {
     if (!isTransitioning) {
-      // highlightConnected(g);
-      // restoreLinksAndNodes();
+      //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      ///////////////////////////////////////////////   Masquer les variables hors du chemin  //////////////////////////////////////////////////////
+      var listOfAncestorsIds = [], listOfChildrenIds = [];
+      getListOfIdsOfAncestors(g, listOfAncestorsIds);
+      getListOfIdsOfChildren(g, listOfChildrenIds);
+      var listOfIds =  listOfAncestorsIds.concat(listOfChildrenIds, [g.id]);
+      var polygonOrRectangle;
+      node.filter(function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == true );}).select("circle").style("opacity", 0.1);
+      // node.filter(function (d){ return ( listOfIds.indexOf(d.id) > -1 ) && ( d.iscalculated == true );}).select("circle")
+      //   .attr("fill", "black")
+      //   .style("stroke", "yellow")
+      //   .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH);
+      node.filter( function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == false ); }).select("polygon").style("opacity",0.1);
+      // node.filter(function (d){ return ( listOfIds.indexOf(d.id) > -1 ) && ( d.iscalculated == false );}).select("polygon")
+      //   .attr("fill", "black")
+      //   .style("stroke", "yellow")
+      //   .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+      link.filter( function (l){  return ( listOfIds.indexOf(l.source.id) < 0 ) || ( listOfIds.indexOf(l.target.id) < 0 ) }).style("opacity", 0.1);
+      // link.filter( function (l){  return ( listOfIds.indexOf(l.source.id) > -1 ) && ( listOfIds.indexOf(l.target.id) > -1 ) }).style("stroke", "yellow");
+      //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       tooltipPathView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
@@ -1493,8 +1577,27 @@ function updatePathView(){
 
   nodeVariableCalculated.on("mouseenter", function (g) {
     if (!isTransitioning) {
-      // highlightConnected(g);
-      // restoreLinksAndNodes();
+      //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      ///////////////////////////////////////////////   Masquer les variables hors du chemin  //////////////////////////////////////////////////////
+      var listOfAncestorsIds = [], listOfChildrenIds = [];
+      getListOfIdsOfAncestors(g, listOfAncestorsIds);
+      getListOfIdsOfChildren(g, listOfChildrenIds);
+      var listOfIds =  listOfAncestorsIds.concat(listOfChildrenIds, [g.id]);
+      var polygonOrRectangle;
+      node.filter(function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == true );}).select("circle").style("opacity", 0.1)
+      // node.filter(function (d){ return ( listOfIds.indexOf(d.id) > -1 ) && ( d.iscalculated == true );}).select("circle")
+      //   .attr("fill", "black")
+      //   .style("stroke", "yellow")
+      //   .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+      //    .style("stroke-width", "2px");
+      node.filter( function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == false ); }).select("polygon").style("opacity",0.1)
+      // node.filter(function (d){ return ( listOfIds.indexOf(d.id) > -1 ) && ( d.iscalculated == false );}).select("polygon")
+      //   .attr("fill", "black")
+      //   .style("stroke", "yellow")
+      //   .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+      link.filter( function (l){  return ( listOfIds.indexOf(l.source.id) < 0 ) || ( listOfIds.indexOf(l.target.id) < 0 ) }).style("opacity", 0.1);
+      // link.filter( function (l){  return ( listOfIds.indexOf(l.source.id) > -1 ) && ( listOfIds.indexOf(l.target.id) > -1 ) }).style("stroke", "yellow");
+      //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       tooltipPathView
         .style("left", g.x + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
@@ -1504,6 +1607,36 @@ function updatePathView(){
           .text(function () {
             return "Equipe : \n" + g.equipe + "\n \n" + "Etape : \n" + g.etape+ "\n";
           });
+    }
+  });
+
+  node.on("mouseleave", function (g) {
+    if (!isTransitioning) {
+      //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      ///////////////////////////////////////////////   Rétablir les variables hors du chemin //////////////////////////////////////////////////////
+      node.filter(function (d){ return ( d.iscalculated );}).select("circle")
+        .style("fill", function (d) { d.color = colorScale_NODES(d.informationsystem); return d.color;})
+        .style("opacity", OPACITY.NODE_DEFAULT)
+        .style("stroke-width", "0px");
+
+      node.filter(function (d){ return ( ! d.iscalculated );}).select("polygon")       
+        .style("fill", function (d) { d.color = colorScale_NODES(d.informationsystem); return d.color; })
+        .style("opacity", OPACITY.NODE_DEFAULT)
+        .style("stroke-width", "0px");
+
+      link.style("stroke", function (d){ var color; color = d3.rgb(LINKS_COLORS[d.controlquality-1]); return color; })
+        .style("opacity", 0)
+        .transition()
+        .delay(TRANSITION_DURATION)
+        .duration(TRANSITION_DURATION)
+        .attr("d", pathPathView)
+        .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
+        .style("stroke-dasharray", function (d){ return (d.dash || "");})
+        .style("stroke", function (d){ var color; color = d3.rgb(LINKS_COLORS[d.controlquality-1]); return color; })
+        .style("opacity", OPACITY.LINK_DEFAULT);
+      //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      hidePathTooltip();
+      // restoreLinksAndNodes();
     }
   });
 
@@ -1528,17 +1661,9 @@ function updatePathView(){
     }
   });
 
-
-  link.on("mouseleave", function (g){
+  link.on("mouseleave", function (){
     if (!isTransitioning){
       hidePathLinkToolTip();
-      restoreLinksAndNodes();
-    }
-  })
-
-  node.on("mouseleave", function () {
-    if (!isTransitioning) {
-      hidePathTooltip();
       restoreLinksAndNodes();
     }
   });
@@ -1553,303 +1678,309 @@ function updatePathView(){
 
   // Create and attach legend
 
-  var legend = svgPathView.select("#legend").selectAll(".legend").data(biHiSankeyPathView.legendData(), function (l) { return l.id; }); // intermediate
+  var legend = svgPathView.select("#legend").selectAll(".legend");
 
-  var legendEnter = legend.enter().append("g")
-                      .attr("class", "legend")
-                      .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";})
+  if (legend[0].length == 0) {
 
-  var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );}),
-      legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );}),
-      legendAutomaticLink = legend.filter(function (l){ return l.text == "Vérification automatique";}),
-      legendSemiAutomaticLink = legend.filter(function (l){ return l.text == "Vérification semi-automatique";}),
-      legendManualLink = legend.filter(function (l){ return l.text == "Vérification manuelle"}),
-      legendQualityOKLink = legend.filter(function (l){ return l.text == "Contrôle OK"}),
-      legendQualityKOLink = legend.filter(function (l){ return l.text == "Contrôle KO"}),
-      legendQualityNOLink = legend.filter(function (l){ return l.text == "Pas de contrôle"}),
-      legendQualityNALink = legend.filter(function (l){ return l.text == "Pas d'information"});
+    legend = legend.data(biHiSankeyPathView.legendData(), function (l) { return l.id; }); // intermediate
 
-    // 1 - Elementary / Calculated variables
-  legendElementaryVariables.append("polygon")
-    .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } )
-    .style("stroke", "black")  // colour the line
-    .style("stroke-width", "1px")
-    .style("fill", "#FFFFFF");
+    var legendEnter = legend.enter().append("g")
+                        .attr("class", "legend")
+                        .attr("transform", function (d){var startX = d.x, startY = d.y; return "translate(" + startX + "," + startY + ")";})
 
-  legendElementaryVariables.append("text")
-    .attr("x", function (d) {return "20px";})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
+    var legendElementaryVariables = legend.filter(function (l) { return ( l.text == "Variable élémentaire" );}),
+        legendCalculatedVariables = legend.filter(function (l){ return ( l.text == "Variable calculée" );}),
+        legendAutomaticLink = legend.filter(function (l){ return l.text == "Vérification automatique";}),
+        legendSemiAutomaticLink = legend.filter(function (l){ return l.text == "Vérification semi-automatique";}),
+        legendManualLink = legend.filter(function (l){ return l.text == "Vérification manuelle"}),
+        legendQualityOKLink = legend.filter(function (l){ return l.text == "Contrôle OK"}),
+        legendQualityKOLink = legend.filter(function (l){ return l.text == "Contrôle KO"}),
+        legendQualityNOLink = legend.filter(function (l){ return l.text == "Pas de contrôle"}),
+        legendQualityNALink = legend.filter(function (l){ return l.text == "Pas d'information"});
 
-  legendCalculatedVariables.append("circle")
-    .attr("fill", " #FFFFFF")
-    .attr("r", NODE_WIDTH/2)
-    .style("stroke", "black")
-    .style("stroke-width", "1px");
+      // 1 - Elementary / Calculated variables
+    legendElementaryVariables.append("polygon")
+      .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } )
+      .style("stroke", "black")  // colour the line
+      .style("stroke-width", "1px")
+      .style("fill", "#FFFFFF");
 
-  legendCalculatedVariables.append("text")
-    .attr("x", function (d) {return "20px";})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
+    legendElementaryVariables.append("text")
+      .attr("x", function (d) {return "20px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
 
-    // 3 - Links
-  legendAutomaticLink.append("polygon")
-    .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )
-    .style("stroke", LINK_DEFAULT_COLOR)
-    .style("stroke-width", "2px")
-    .style("fill", LINK_DEFAULT_COLOR);
+    legendCalculatedVariables.append("circle")
+      .attr("fill", " #FFFFFF")
+      .attr("r", NODE_WIDTH/2)
+      .style("stroke", "black")
+      .style("stroke-width", "1px");
 
-  legendAutomaticLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
+    legendCalculatedVariables.append("text")
+      .attr("x", function (d) {return "20px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
 
-  legendSemiAutomaticLink.append("line")
-    .attr("x1", function(d) {return 0;})
-    .attr("y1", function(d) {return 0;})
-    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
-    .attr("y2", function(d) {return 0;})
-    .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
-    .style("stroke-width", "2px")
-    .style("fill", LINK_DEFAULT_COLOR);
+      // 3 - Links
+    legendAutomaticLink.append("polygon")
+      .attr("points", function (l){  return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )
+      .style("stroke", LINK_DEFAULT_COLOR)
+      .style("stroke-width", "2px")
+      .style("fill", LINK_DEFAULT_COLOR);
 
-  legendSemiAutomaticLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
+    legendAutomaticLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
 
-  legendManualLink.append("line")
-    .attr("x1", function(d) {return 0;})
-    .attr("y1", function(d) {return 0;})
-    .attr("x2", function(d) {return NODE_WIDTH*2.3;})
-    .attr("y2", function(d) {return 0;})
-    .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
-    .style("stroke-width", "2px")
-    .style("stroke-dasharray", "5,5")
-    .style("fill", LINK_DEFAULT_COLOR);
+    legendSemiAutomaticLink.append("line")
+      .attr("x1", function(d) {return 0;})
+      .attr("y1", function(d) {return 0;})
+      .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+      .attr("y2", function(d) {return 0;})
+      .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
+      .style("stroke-width", "4px")
+      .style("fill", LINK_DEFAULT_COLOR);
 
-  legendManualLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
+    legendSemiAutomaticLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
 
-  legendQualityOKLink.append("polygon")
-    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
-    .style("stroke", d3.rgb(LINKS_COLORS[0]))
-    .style("stroke-width", "2px")
-    .style("opacity", 0.6)
-    .style("fill", d3.rgb(LINKS_COLORS[0]));
+    legendManualLink.append("line")
+      .attr("x1", function(d) {return 0;})
+      .attr("y1", function(d) {return 0;})
+      .attr("x2", function(d) {return NODE_WIDTH*2.3;})
+      .attr("y2", function(d) {return 0;})
+      .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
+      .style("stroke-width", "4px")
+      .style("stroke-dasharray", "5,5")
+      .style("fill", LINK_DEFAULT_COLOR);
 
-  legendQualityOKLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
+    legendManualLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
 
-  legendQualityKOLink.append("polygon")
-    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
-    .style("stroke", d3.rgb(LINKS_COLORS[1]))
-    .style("stroke-width", "2px")
-    .style("opacity", 0.6)
-    .style("fill", d3.rgb(LINKS_COLORS[1]));
+    legendQualityOKLink.append("polygon")
+      .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+      .style("stroke", d3.rgb(LINKS_COLORS[0]))
+      .style("stroke-width", "2px")
+      .style("opacity", 0.6)
+      .style("fill", d3.rgb(LINKS_COLORS[0]));
 
-  legendQualityKOLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
+    legendQualityOKLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
 
-  legendQualityNOLink.append("polygon")
-    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
-    .style("stroke", d3.rgb(LINKS_COLORS[2]))
-    .style("stroke-width", "2px")
-    .style("opacity", 0.6)
-    .style("fill", d3.rgb(LINKS_COLORS[2]));
+    legendQualityKOLink.append("polygon")
+      .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+      .style("stroke", d3.rgb(LINKS_COLORS[1]))
+      .style("stroke-width", "2px")
+      .style("opacity", 0.6)
+      .style("fill", d3.rgb(LINKS_COLORS[1]));
 
-  legendQualityNOLink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
+    legendQualityKOLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
 
-  legendQualityNALink.append("polygon")
-    .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
-    .style("stroke", d3.rgb(LINKS_COLORS[3]))
-    .style("stroke-width", "2px")
-    .style("opacity", 0.6)
-    .style("fill", d3.rgb(LINKS_COLORS[3]));
+    legendQualityNOLink.append("polygon")
+      .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+      .style("stroke", d3.rgb(LINKS_COLORS[2]))
+      .style("stroke-width", "2px")
+      .style("opacity", 0.6)
+      .style("fill", d3.rgb(LINKS_COLORS[2]));
 
-  legendQualityNALink.append("text")
-    .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
-    .attr("y", function (d) {return 0;})
-    .attr("dy", ".35em")
-    .attr("text-anchor", "start")
-    .attr("transform", null)
-    .text(function (d) { return d.text; });
+    legendQualityNOLink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
 
-    // 4 - Interactivity
-  
-  var nonCalculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && !( d.iscalculated ) ) ;}),
-      calculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && ( d.iscalculated ) ) ;});
+    legendQualityNALink.append("polygon")
+      .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
+      .style("stroke", d3.rgb(LINKS_COLORS[3]))
+      .style("stroke-width", "2px")
+      .style("opacity", 0.6)
+      .style("fill", d3.rgb(LINKS_COLORS[3]));
 
-  var automaticLinks = link.filter(function (d){ return (d.controlnature == 1);}),
-      semiAutomaticLinks = link.filter(function (d){ return (d.controlnature == 2);}),
-      manualLinks = link.filter(function (d){ return (d.controlnature == 3);}),
-      qualityOKLinks = link.filter(function (d){ return (d.controlquality == 1);}),
-      qualityKOLinks = link.filter(function (d){ return (d.controlquality == 2);}),
-      qualityNOLinks = link.filter(function (d){ return (d.controlquality == 3);}),
-      qualityNALinks = link.filter(function (d){ return (d.controlquality == 4);});
+    legendQualityNALink.append("text")
+      .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
 
-  function restoreVariableNode(type){
-    switch (type) {
-      case "Variable élémentaire":
-        nonCalculatedVariables
-          .select("polygon")
+      // 4 - Interactivity
+    
+    var nonCalculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && !( d.iscalculated ) ) ;}),
+        calculatedVariables = node.filter(function (d){ return ( ( d.type === "variable" ) && ( d.iscalculated ) ) ;});
+
+    var automaticLinks = link.filter(function (d){ return (d.controlnature == 1);}),
+        semiAutomaticLinks = link.filter(function (d){ return (d.controlnature == 2);}),
+        manualLinks = link.filter(function (d){ return (d.controlnature == 3);}),
+        qualityOKLinks = link.filter(function (d){ return (d.controlquality == 1);}),
+        qualityKOLinks = link.filter(function (d){ return (d.controlquality == 2);}),
+        qualityNOLinks = link.filter(function (d){ return (d.controlquality == 3);}),
+        qualityNALinks = link.filter(function (d){ return (d.controlquality == 4);});
+
+    function restoreVariableNode(type){
+      switch (type) {
+        case "Variable élémentaire":
+          nonCalculatedVariables
+            .select("polygon")
+            .style("stroke", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;})
+            .style("fill", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;});
+          break;
+        case "Variable calculée":
+          calculatedVariables
+          .select("circle")
           .style("stroke", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;})
           .style("fill", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;});
-        break;
-      case "Variable calculée":
-        calculatedVariables
-        .select("circle")
-        .style("stroke", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;})
-        .style("fill", function (d){d.color = colorScale_NODES(d.informationsystem); return d.color;});
-        break;
+          break;
+      }
     }
-  }
 
-  function restoreLink(type){
-    var currentLinkCollection;
-    switch (type) {
-      case "Vérification automatique":
-        currentLinkCollection = automaticLinks;
-        break;
-      case "Vérification semi-automatique":
-        currentLinkCollection = semiAutomaticLinks;
-        break;
-      case "Vérification manuelle":
-        currentLinkCollection = manualLinks;
-        break;
-      case "Contrôle OK":
-        currentLinkCollection = qualityOKLinks;
-        break;
-      case "Contrôle KO":
-        currentLinkCollection = qualityKOLinks;
-        break;
-      case "Pas de contrôle":
-        currentLinkCollection = qualityNOLinks;
-        break;
-      case "Pas d'information":
-        currentLinkCollection = qualityNALinks;
-        break;
+    function restoreLink(type){
+      var currentLinkCollection;
+      switch (type) {
+        case "Vérification automatique":
+          currentLinkCollection = automaticLinks;
+          break;
+        case "Vérification semi-automatique":
+          currentLinkCollection = semiAutomaticLinks;
+          break;
+        case "Vérification manuelle":
+          currentLinkCollection = manualLinks;
+          break;
+        case "Contrôle OK":
+          currentLinkCollection = qualityOKLinks;
+          break;
+        case "Contrôle KO":
+          currentLinkCollection = qualityKOLinks;
+          break;
+        case "Pas de contrôle":
+          currentLinkCollection = qualityNOLinks;
+          break;
+        case "Pas d'information":
+          currentLinkCollection = qualityNALinks;
+          break;
+      }
+      currentLinkCollection
+          .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
+          .style("stroke-dasharray", function (d){ return (d.dash || "");})
+          .style("stroke", function (d){
+            var color;
+            if (d.linktype == "variable") {
+              color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
+            } else {
+              color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
+            }
+            return color;
+          });
     }
-    currentLinkCollection
-        .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
-        .style("stroke-dasharray", function (d){ return (d.dash || "");})
-        .style("stroke", function (d){
-          var color;
-          if (d.linktype == "variable") {
-            color = d3.rgb(LINKS_COLORS[d.istransformed ? 4:5]);
-          } else {
-            color = d3.rgb(LINKS_COLORS[d.controlquality-1]);
-          }
-          return color;
-        });
+
+    legendElementaryVariables.on("mouseenter", function (){
+      nodeVariableElementary.select("polygon")
+        .attr("fill", "black")
+        .style("stroke", "yellow")
+        .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+    });
+
+    legendCalculatedVariables.on("mouseenter", function (){
+      nodeVariableCalculated.select("circle")
+        .attr("fill", "black")
+        .style("stroke", "yellow")
+        .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+    });
+
+    legendAutomaticLink.on("mouseenter", function (){
+      automaticLinks
+        .style("stroke", "yellow")
+    });
+
+    legendSemiAutomaticLink.on("mouseenter", function (){
+      semiAutomaticLinks
+        .style("stroke", "yellow")
+    });
+
+    legendManualLink.on("mouseenter", function (){
+      manualLinks
+        .style("stroke", "yellow")
+    });
+
+    legendQualityOKLink.on("mouseenter", function (){
+      qualityOKLinks
+        .style("stroke", "yellow")
+    });
+
+    legendQualityKOLink.on("mouseenter", function (){
+      qualityKOLinks
+        .style("stroke", "yellow")
+    });
+
+    legendQualityNOLink.on("mouseenter", function (){
+      qualityNOLinks
+        .style("stroke", "yellow")
+    });
+
+    legendQualityNALink.on("mouseenter", function (){
+      qualityNALinks
+        .style("stroke", "yellow")
+    });
+
+    legendElementaryVariables.on("mouseleave", function (l){restoreVariableNode("Variable élémentaire");});
+
+    legendCalculatedVariables.on("mouseleave", function (l){restoreVariableNode("Variable calculée");});
+
+    legendAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification automatique");});
+
+    legendSemiAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification semi-automatique");});
+
+    legendManualLink.on("mouseleave", function (l){restoreLink("Vérification manuelle");});
+
+    legendQualityOKLink.on("mouseleave", function (l){restoreLink("Contrôle OK");});
+
+    legendQualityKOLink.on("mouseleave", function (l){restoreLink("Contrôle KO");});
+
+    legendQualityNOLink.on("mouseleave", function (l){restoreLink("Pas de contrôle");});
+
+    legendQualityNALink.on("mouseleave", function (l){restoreLink("Pas d'information");});
+
   }
-
-  legendElementaryVariables.on("mouseenter", function (){
-    nodeVariableElementary.select("polygon")
-      .attr("fill", "black")
-      .style("stroke", "yellow")
-      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
-  });
-
-  legendCalculatedVariables.on("mouseenter", function (){
-    nodeVariableCalculated.select("circle")
-      .attr("fill", "black")
-      .style("stroke", "yellow")
-      .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
-  });
-
-  legendAutomaticLink.on("mouseenter", function (){
-    automaticLinks
-      .style("stroke", "yellow")
-  });
-
-  legendSemiAutomaticLink.on("mouseenter", function (){
-    semiAutomaticLinks
-      .style("stroke", "yellow")
-  });
-
-  legendManualLink.on("mouseenter", function (){
-    manualLinks
-      .style("stroke", "yellow")
-  });
-
-  legendQualityOKLink.on("mouseenter", function (){
-    qualityOKLinks
-      .style("stroke", "yellow")
-  });
-
-  legendQualityKOLink.on("mouseenter", function (){
-    qualityKOLinks
-      .style("stroke", "yellow")
-  });
-
-  legendQualityNOLink.on("mouseenter", function (){
-    qualityNOLinks
-      .style("stroke", "yellow")
-  });
-
-  legendQualityNALink.on("mouseenter", function (){
-    qualityNALinks
-      .style("stroke", "yellow")
-  });
-
-  legendElementaryVariables.on("mouseleave", function (l){restoreVariableNode("Variable élémentaire");});
-
-  legendCalculatedVariables.on("mouseleave", function (l){restoreVariableNode("Variable calculée");});
-
-  legendAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification automatique");});
-
-  legendSemiAutomaticLink.on("mouseleave", function (l){restoreLink("Vérification semi-automatique");});
-
-  legendManualLink.on("mouseleave", function (l){restoreLink("Vérification manuelle");});
-
-  legendQualityOKLink.on("mouseleave", function (l){restoreLink("Contrôle OK");});
-
-  legendQualityKOLink.on("mouseleave", function (l){restoreLink("Contrôle KO");});
-
-  legendQualityNOLink.on("mouseleave", function (l){restoreLink("Pas de contrôle");});
-
-  legendQualityNALink.on("mouseleave", function (l){restoreLink("Pas d'information");});
 
 }
 
 function launchDataVizModuleForPathView() {
 
   var vizData = {WIDTH : WIDTH, nbMaximumNodes: 1000};
-  var NodesCharacteristicsForPathView = pathViewTransform(NodesAndLinksForPathView[0], NodesAndLinksForPathView[1], vizData);
+  NodesCharacteristicsForPathView = pathViewTransform(NodesAndLinksForPathView[0], NodesAndLinksForPathView[1], vizData);
   var legendData = NodesCharacteristicsForPathView[2];
   var nodes = NodesCharacteristicsForPathView[0];
   var links = NodesCharacteristicsForPathView[1];
@@ -1871,10 +2002,10 @@ function launchDataVizModuleForPathView() {
     .nodes(nodes)
     .links(links)
     .initializeNodes(function (node) {
-      node.state = node.parent ? "contained" : "collapsed";
+      node.visible = true;
+      node.status = "open";
     }) // initializeNodes calling 6 functions, generating temporary variables used for display 
-    .layout(LAYOUT_INTERATIONS); // layout calls 6 functions, including one which computing default x and y positions.
-
+    .layout(); // layout calls 6 functions, including one which computing default x and y positions.
   disableUserInterractions(2 * TRANSITION_DURATION);
   updatePathView();
 

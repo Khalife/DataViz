@@ -59,27 +59,43 @@ function getSegmentedPosition(i, nbNodes, Width){
   return position;
 }
 
+function findOccurrencesIn(arr, val) {
+    // Function used to return occurences of val in arr
+    var i, j,
+        count = 0;
+    for (i = 0, j = arr.length; i < j; i++) {
+        (arr[i] === val) && count++;
+    }
+    return count;
+}
+
 function getAggregateControlNature(informationSystem, Nodes){
   // // Reminder : control nature varies in {1, 2, 3} 
   // TODO: define an aggregation rule, here average is rounded and returned
   // debugger;
-  var aggrControlNature = 0;
+  var aggrControlNature = [];
   var nbNodesContained = 0;
   for (var n of Nodes){
     if ( n["informationsystem"] == informationSystem ) {
-      nbNodesContained = nbNodesContained + 1;
-      aggrControlNature = aggrControlNature + n["controlnature"];
+      if ( n.controlnature == 3 ){
+        return 3;
+      }
+      aggrControlNature.push(n.controlnature);
     }
   }
 
-  if ( nbNodesContained == 0 ){
+  if ( aggrControlNature.indexOf(3) > -1 ){
     // console.log("Warning : Information system without variable");
-    return 2;
+    return 3;
   } 
 
-  else{
-    aggrControlNature = aggrControlNature / Math.max(nbNodesContained,1);
-    return Math.round(aggrControlNature); 
+  // In this case, there is no semi-auto index
+  if ( aggrControlNature.indexOf(2) < 0){
+    return 1;
+  } else if( aggrControlNature.indexOf(1) < 0){
+    return 2;
+  } else {
+    return 3; // because there are automatic and manual controls
   }
 }
 
@@ -87,75 +103,117 @@ function getAggregateControlQuality(informationSystem, Nodes){
   // // Reminder : control quality varies in {1, 2, 3, 4} 
   // TODO: define an aggregation rule, here average is rounded and returned
   // debugger;
-  var aggrControlQuality = 0;
-  var nbNodesContained = 0;
+  var controlNaturesList = [], controlNaturesListWithoutNA = [];
   for (var n of Nodes){
-    if ( n["informationsystem"] == informationSystem ) {
-      nbNodesContained = nbNodesContained + 1;
-      aggrControlQuality = aggrControlQuality + n["controlquality"];
+    if ( n["informationsystem"] == informationSystem ){
+      controlNaturesList.push(n.controlquality);
+      controlNaturesListWithoutNA.push(n.controlquality);
     }
   }
 
-  if ( nbNodesContained == 0 ){
-    //console.log("Warning : Information system without variable");
-    return 2;
-  } 
+  for (var i = controlNaturesList.length - 1; i >= 0; i--) {
+    if(controlNaturesListWithoutNA[i] === 4) {
+       controlNaturesListWithoutNA.splice(i, 1);
+    }
+  }
+
+  if ( controlNaturesListWithoutNA.length == 0){
+    return 4;
+  }
+
+  var nbControleIdentifies = controlNaturesListWithoutNA.length;
+  var nbControleNonIdentifies = controlNaturesList.length - nbControleIdentifies;
+  if ( nbControleIdentifies <= nbControleNonIdentifies ){
+    return 4;
+  }
+
+  var nbControleOK = findOccurrencesIn(controlNaturesListWithoutNA, 1);
+  var nbControleKO = findOccurrencesIn(controlNaturesListWithoutNA, 2);
+  var nbControleNO = findOccurrencesIn(controlNaturesListWithoutNA, 3);
+
+  if ( nbControleOK + nbControleKO <= nbControleNO ){
+    return 3;
+  }
+  if ( nbControleOK < nbControleKO ){
+    return  2;
+  }
 
   else{
-    aggrControlQuality = aggrControlQuality / Math.max(nbNodesContained,1);
-    return Math.round(aggrControlQuality); 
+    return 1;
   }
 }
 
+
 function getAggregateControlNatureText(informationSystem, Nodes, controlQualities){
   // // Reminder : control nature varies in {1, 2, 3} 
-  // TODO: define an aggregation rule, here average is rounded and returned
+  // TODO: define an aggregation rule, here average it is "Automatic, Manual, Semi-automatic" specific
   // debugger;
-  var aggrControlNature = 0;
-  var nbNodesContained = 0;
-  var averageIndex;
+  var controlNaturesList = [];
   for (var n of Nodes){
-    if ( n["informationsystem"] == informationSystem ) {
-      nbNodesContained = nbNodesContained + 1;
-      aggrControlNature = aggrControlNature + controlQualities.indexOf(n["controlnature"]);
+    if ( n["informationsystem"] == informationSystem ){
+      if ( n.controlnaturetext == "Semi-automatique" ){
+        return "Semi-automatique";
+      }
+      controlNaturesList.push(n.controlnaturetext);
     }
   }
 
-  if ( nbNodesContained == 0 ){
-    // console.log("Warning : Information system without variable");
-    return controlQualities[Math.max(1, controlQualities.length)];
-  } 
-
-  else{
-    averageIndex = aggrControlNature / Math.max(nbNodesContained,1);
-    return controlQualities[Math.round(averageIndex)]; 
+  // In this case, there is no semi-auto index
+  if ( controlNaturesList.indexOf("Manuel") < 0){
+    return "Automatique";
+  } else if( controlNaturesList.indexOf("Automatique") < 0){
+    return "Manuel";
+  } else {
+    return "Semi-automatique"; // because there are automatic and manual controls
   }
+
 }
 
 function getAggregateControlQualityText(informationSystem, Nodes, controlNatures){
   // // Reminder : control quality varies in {1, 2, 3, 4} 
-  // TODO: define an aggregation rule, here average is rounded and returned
+  // TODO: define an aggregation rule, it is "OK, KO, NO, NA" specific
   // debugger;
-  var aggrControlQuality = 0;
-  var nbNodesContained = 0;
-  var averageIndex;
+  var controlNaturesList = [], controlNaturesListWithoutNA = [];
   for (var n of Nodes){
-    if ( n["informationsystem"] == informationSystem ) {
-      nbNodesContained = nbNodesContained + 1;
-      aggrControlQuality = aggrControlQuality + controlNatures.indexOf(n["controlquality"]);
+    if ( n["informationsystem"] == informationSystem ){
+      controlNaturesList.push(n.controlqualitytext);
+      controlNaturesListWithoutNA.push(n.controlqualitytext);
     }
   }
 
-  if ( nbNodesContained == 0 ){
-    //console.log("Warning : Information system without variable");
-    return controleNatures[Math.max(1, controlNatures.length)];
-  } 
+  for (var i = controlNaturesListWithoutNA.length - 1; i >= 0; i--) {
+    if(controlNaturesListWithoutNA[i] === "NA") {
+       controlNaturesListWithoutNA.splice(i, 1);
+    }
+  }
+
+
+  if ( controlNaturesListWithoutNA.length == 0){
+    return "NA";
+  }
+
+  // in this case, there are others values than NA
+
+  var nbControleIdentifies = controlNaturesListWithoutNA.length;
+  var nbControleNonIdentifies = controlNaturesList.length - nbControleIdentifies;
+  if ( nbControleIdentifies <= nbControleNonIdentifies ){
+    return "NA";
+  }
+
+  var nbControleOK = findOccurrencesIn(controlNaturesListWithoutNA, "OK");
+  var nbControleKO = findOccurrencesIn(controlNaturesListWithoutNA, "KO");
+  var nbControleNO = findOccurrencesIn(controlNaturesListWithoutNA, "NO");
+
+  if ( nbControleOK + nbControleKO <= nbControleNO){
+    return "NO"; 
+  }
+
+  if ( nbControleOK < nbControleKO ){
+    return  "KO";
+  }
 
   else{
-    averageIndex = aggrControlQuality / Math.max(nbNodesContained,1);
-    console.log(averageIndex);
-    console.log(controlNatures);
-    return controlNatures[Math.round(averageIndex)]; 
+    return "OK";
   }
 }
 
@@ -194,16 +252,22 @@ function getTransformedNodesFromIS(Nodes, is){
 function getControlNaturesFromNodes(Nodes){
   var controlNatureList = [];
   for (var n of Nodes){
-    controlNatureList.push(n.controlnature);
+    if ( n.controlnaturetext != "" ){
+      controlNatureList.push(n.controlnaturetext);
+    }
+
   }
   controlNatureList = controlNatureList.getUnique();
+
   return controlNatureList;
 }
 
 function getControlQualitiesFromNodes(Nodes){
   var controlQualityList = [];
   for (var n of Nodes){
-    controlQualityList.push(n.controlquality);
+    if ( n.controlqualitytext != ""){
+      controlQualityList.push(n.controlqualitytext);
+    }
   }
   controlQualityList = controlQualityList.getUnique();
   return controlQualityList;
@@ -211,12 +275,10 @@ function getControlQualitiesFromNodes(Nodes){
 
 function applicativeViewTransform(Nodes, Links, vizData){
   // Function allowing to transform nature of nodes and links
-
   var controlQualities = getControlQualitiesFromNodes(Nodes);
   var controlNatures = getControlNaturesFromNodes(Nodes);
   var NewLinks = [];
   var NewNodes = [];
-  // var informationSystems = [];
   var NodeCharacteristics = [];
   var position;
   var issueIS = false;
@@ -277,9 +339,9 @@ function applicativeViewTransform(Nodes, Links, vizData){
       "controlquality" : controlQuality,
       "controlnature" : controlNature,
       "table" : table,
-      "champs" : champs
-      // "width" : defaultWidth/4,
-      // "height" : defaultHeight/2
+      "champs" : champs,
+      "controlnaturetext" : "",
+      "controlqualitytext" : ""
     };
     NewNodes.push(newNode);
   }
@@ -293,6 +355,7 @@ function applicativeViewTransform(Nodes, Links, vizData){
   for (var i = 0; i < NewNodes.length - 1; i++){
       // create list of nodes that are transformed 
       listOfTransformedNodesNames = getTransformedNodesFromIS(Nodes, NewNodes[i].name);
+
       NewLinks.push({
         "linktype" : "informationsystem",
         "source" : NewNodes[i]["id"],
@@ -301,7 +364,7 @@ function applicativeViewTransform(Nodes, Links, vizData){
         "controlnature" : getAggregateControlNature(NewNodes[i]["name"], Nodes),
         "controlquality" : getAggregateControlQuality(NewNodes[i]["name"], Nodes),
         "controlnaturetext" : getAggregateControlNatureText(NewNodes[i]["name"], Nodes, controlNatures),
-        "controlqualitytext" : getAggregateControlNatureText(NewNodes[i]["name"], Nodes, controlNatures),
+        "controlqualitytext" : getAggregateControlQualityText(NewNodes[i]["name"], Nodes, controlNatures),
         "view" : "app",
         "table" : NewNodes[i]["table"],
         "transformedvariables" : listOfTransformedNodesNames,
@@ -320,6 +383,7 @@ function applicativeViewTransform(Nodes, Links, vizData){
       "iscalculated" : iscalculated,
       // "istransformed" : Nodes[i].istransformed,
       "id": lengthWithoutVariables + i,
+      "idFromSource": Nodes[i]["presentId"],
       "name" : Nodes[i].name,
       "x" : 0,
       "y" : 0,
@@ -331,8 +395,6 @@ function applicativeViewTransform(Nodes, Links, vizData){
       "champs" : Nodes[i]["champs"],
       "controlqualitytext" : Nodes[i]["controlqualitytext"],
       "controlnaturetext" : Nodes[i]["controlnaturetext"]
-      // "width" : defaultWidth / 4,
-      // "height" : defaultHeight / 2
     });
   }
   /////////////////// Creating links between variable and apps //////////////////////////
@@ -397,7 +459,6 @@ function applicativeViewTransform(Nodes, Links, vizData){
     })
   }
 
-  //legendData.push({"nodeLegendWidth" : , "rectangleLegendWidth" : });
   //////////////////////////////////////////////////////////////////////////////////////
   var returnLinks = unique(NewLinks, compareLinkObjects, vizData.nbMaximumNodes);
   return [NewNodes, returnLinks, legendData];
@@ -446,8 +507,6 @@ function pathViewTransform(Nodes, Links, vizData){
       "equipe" : Nodes[i].equipe,
       "champs" : Nodes[i].champs,
       "etape" : Nodes[i].etape
-      // "width" : defaultWidth / 4,
-      // "height" : defaultHeight / 2
     });
   }
   for (var i = 0; i!= Links.length; i++){
@@ -484,7 +543,6 @@ function pathViewTransform(Nodes, Links, vizData){
   for (var i = 0; i < nbLegendNodes + nbLegendLinks; i++){
     var xMargin = 0, yMargin = 0;
     if ( i <= 1 ){ xMargin = nodeWidth/2;}
-    //if ( i <= 2 ){ yMargin = 45;}
     legendPositions.push([ LEGEND_X_ANCHOR + xMargin, LEGEND_Y_ANCHOR + i*(nodeWidth + yMargin)]);
   }
 
@@ -510,6 +568,5 @@ function pathViewTransform(Nodes, Links, vizData){
 
 
   ////////////////////////////////////////////////////////////////////////////////////////
-  // return [NewNodes, Links, legendData];
   return [NewNodes, Links, legendData];
 }

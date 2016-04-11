@@ -230,11 +230,12 @@ function createPathNodesAndLinksFromData(data){
     "etape" : "",
     "equipe" : "",
     "responsable" : "",
-    "champs" : ""
+    "champs" : "",
+    "controlqualitytext" : "",
+    "controlnaturetext" : ""
   }
   Nodes.push(outputNode);
   var result = [Nodes, Links];
-  // debugger;
   NodesAndLinksForAppView = result;
   NodesAndLinksForPathView = result;
 
