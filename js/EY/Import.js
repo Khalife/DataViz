@@ -1,15 +1,8 @@
 ﻿// JS File used to build vizualisation data using Graph structure (nodes and links)
-var NodesAndLinksForAppView;
-var NodesAndLinksForPathView;
-var dataNames = [];
-// Limits of parsing (line numbers) :
-var begin = 11;
-var end = 58;
-
 
 function getWorksheetFromFile(file){
   // Principal function parsing Excel worksheet from input file and modifying NodesAndLinks Global Variable
-  // Calls functions buildVizData, getIdFromName, createNodesAndLinksFromData
+  // Calls functions buildVizData
   // Input : pathfile (String)
   // No return value
   var workbook, worksheet;
@@ -85,16 +78,6 @@ function buildVizData(worksheet, numberOfLineBeginning, numberOfLineEnding){
     }
   }
   createPathNodesAndLinksFromData(data);
-}
-
-function getIdFromName(array, name){
-  // Returns Id of the corresponding name variable in the dict-array or -1 if not existing
-  for (var i = 0; i != array.length; i++){
-    //console.log(array[i]["present"]);
-    if (array[i]["present"] == name)
-      return array[i]["id"];
-  }
-  return -1;
 }
 
 function getControlQuality(text){
@@ -188,6 +171,7 @@ function createPathNodesAndLinksFromData(data){
   }
 
   for (var i = 0; i != data.length; i ++){
+    // if ( data[i]["present"] == "Code devise"){ debugger;}
     var newNode = {
       "type": 'Global',
       "presentId": data[i]["presentId"],
@@ -195,7 +179,7 @@ function createPathNodesAndLinksFromData(data){
       "isOutputNode": false,
       "nextId": data[i]["nextId"] || data[i]["outputId"],
       "next": data[i]["next"] || data[i]["output"],
-      "nextIS": replaceISname(data[i]["nextIS"]) || "output",
+      "nextIS": replaceISname(data[i]["nextIS"]) || data[i]["output"],
       "code": "",
       "informationsystem": replaceISname(data[i]["informationsystem"]),
       "istransformed": getIsTransformed(data[i]["istransformed"]),
@@ -222,7 +206,7 @@ function createPathNodesAndLinksFromData(data){
     "next": "",
     "nextIS": "",
     "code": "",
-    "informationsystem": "output",
+    "informationsystem": data[0]["output"],
     "istransformed": "",
     "informationtype" : "Calculée",
     "controlnature" : "",
@@ -239,10 +223,9 @@ function createPathNodesAndLinksFromData(data){
   NodesAndLinksForAppView = result;
   NodesAndLinksForPathView = result;
 
-  // AUTO LAUNCH - test
+  document.getElementById("container").style = "visibility: visible;"
   launchDataVizModuleForAppView();
   launchDataVizModuleForPathView();
-
 }
 
 function handleFileSelect(evt) {

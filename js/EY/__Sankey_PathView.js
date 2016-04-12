@@ -5,30 +5,13 @@ d3.Sankey_PathView = function () {
   "use strict";
 
   var biHiSankey = {},
-    nodeWidth = 24,
-    nodeHeight = 40,
-    nodeSpacing = 8,
-    linkSpacing = 5,
-    arrowheadScaleFactor = 0, // Specifies the proportion of a link's stroke width to be allowed for the marker at the end of the link.
-    size = [1, 1], // default to one pixel by one pixel
     nodes = [],
     nodeMap = {},
     parentNodes = [],
     leafNodes = [],
     links = [],
-    xScaleFactor = 1,
-    yScaleFactor = 1,
-    defaultLinkCurvature = 1,
-    WIDTH = 1100,
-    VERTICAL_OFFSET = -250,
-    HORIZONTAL_OFFSET = 150,
-    VERTICAL_INCREMENT = 70,
     informationSystems,
     legendData;
-
-  function center(node) {
-    return node.y + node.height / 2;
-  }
 
   function value(link) {
     return link.value;
@@ -59,17 +42,9 @@ d3.Sankey_PathView = function () {
   }
 
   function computeParentNodes() {
-    debugger;
     parentNodes = nodes.filter(function (node) {
       return node.children.length;
     });
-  }
-
-  function addAncestorsToChildren(node) {
-    node.children.forEach(function (child) {
-      child.ancestors = child.ancestors.concat(this.ancestors.concat([this]));
-      addAncestorsToChildren(child);
-    }, node);
   }
 
   // generate hierarchical connections between parent and child nodes
@@ -80,35 +55,14 @@ d3.Sankey_PathView = function () {
     links.forEach(function (link) {
       sourceNode = nodeMap[link.source] || link.source || "";
       targetNode = nodeMap[link.target] || link.target || "";
-      console.log(sourceNode.name + " -> " + targetNode.name);
+      // if (targetNode) { targetNode.children.push(sourceNode); }
+      // if (sourceNode) { sourceNode.parent = targetNode };
       if (targetNode) { sourceNode.children.push(targetNode); }
       if (sourceNode) { targetNode.parent = sourceNode; targetNode.ancestors.push(sourceNode) };
     });
     computeLeafNodes();
     computeParentNodes();
   }
-  // function computeNodeHierarchy() {
-  //   var parent,
-  //       rootNodes = [];
-
-  //   nodes.forEach(function (node) {
-  //     parent = nodeMap[node.parent];
-  //     if (parent) {
-  //       node.parent = parent;
-  //       parent.children.push(node);
-  //     } else {
-  //       node.parent = null;
-  //       rootNodes.push(node);
-  //     }
-  //   });
-
-  //   computeLeafNodes();
-  //   computeParentNodes();
-
-  //   rootNodes.forEach(function (rNode) {
-  //     addAncestorsToChildren(rNode);
-  //   });
-  // }
 
   // Populate the sourceLinks and targetLinks for each node.
   function computeNodeLinks() {
@@ -257,51 +211,6 @@ d3.Sankey_PathView = function () {
     });
   }
 
-  function sourceAndTargetNodesWithSameX() {
-    var nodeArray = [];
-    links.filter(function (link) {
-      return link.target.x === link.source.x;
-    }).forEach(function (link) {
-      if (nodeArray.indexOf(link.target) < 0) {
-        nodeArray.push(link.target);
-      }
-    });
-    return nodeArray;
-  }
-
-  function scaleNodeXPositions() {
-    var minX = d3.min(nodes, function (node) { return node.x; }),
-        maxX = d3.max(nodes, function (node) { return node.x; }) - minX;
-    xScaleFactor = (size[0] - nodeWidth) / maxX;
-
-    nodes.forEach(function (node) {
-      node.x *= xScaleFactor;
-    });
-  }
-
-  function compressInXDirection() {
-    var connectedNodesXPositions,
-        nodesByXPosition = d3.nest()
-          .key(function (node) { return node.x; })
-          .sortKeys(d3.ascending)
-          .entries(nodes)
-          .map(function (object) { return object.values; });
-
-    nodesByXPosition.forEach(function (xnodes) {
-      xnodes.forEach(function (node) {
-        connectedNodesXPositions = node.connectedNodes.map(function (connectedNode) {
-          return connectedNode.x;
-        });
-        // keep decrementing the x value of the node
-        // unless it would have the same x value as one of its source or target nodes
-        // or node.x is already 0
-        while (node.x > 0 && connectedNodesXPositions.indexOf(node.x - 1) < 0) {
-          node.x -= 1;
-        }
-      });
-    });
-  }
-
   function computePathViewNodeXPositions() {
     var nodesByInformationSystem = d3.nest()
       .key(function (node) { return node.informationsystem; })
@@ -311,7 +220,7 @@ d3.Sankey_PathView = function () {
     nodesByInformationSystem.forEach( function (nodes,i) { 
       nodes.forEach(function (n) {
         n.width = nodeWidth;
-        n.x = HORIZONTAL_OFFSET + i*WIDTH/(nodesByInformationSystem.length+3);
+        n.x = HORIZONTAL_OFFSET_PATHVIEW + i*WIDTH/(nodesByInformationSystem.length+3);
       })
     });
   }
@@ -385,40 +294,10 @@ d3.Sankey_PathView = function () {
     }
 
     function initializeNodeYPosition() {
-      nodesByXPosition.forEach(function (nodes) {
+      nodesByXPosition.forEach(function (nodes, j) {
         nodes.forEach(function (node, i) {
-          node.y = VERTICAL_INCREMENT*i;
+          node.y = VERTICAL_INCREMENT_PATHVIEW*(i + 0.5*(j + Math.random()));
           node.heightAllowance = node.value * yScaleFactor + linkSpacing * node.linkSpaceCount;
-        });
-      });
-    }
-
-    function relaxLeftToRight(alpha) {
-      function weightedSource(link) {
-        return center(link.source) * link.value;
-      }
-
-      nodesByXPosition.forEach(function (nodes) {
-        nodes.forEach(function (node) {
-          if (node.rightLinks.length) {
-            var y = d3.sum(node.rightLinks, weightedSource) / d3.sum(node.rightLinks, value);
-            node.y += (y - center(node)) * alpha;
-          }
-        });
-      });
-    }
-
-    function relaxRightToLeft(alpha) {
-      function weightedTarget(link) {
-        return center(link.target) * link.value;
-      }
-
-      nodesByXPosition.slice().reverse().forEach(function (nodes) {
-        nodes.forEach(function (node) {
-          if (node.leftLinks.length) {
-            var y = d3.sum(node.leftLinks, weightedTarget) / d3.sum(node.leftLinks, value);
-            node.y += (y - center(node)) * alpha;
-          }
         });
       });
     }
@@ -538,7 +417,6 @@ d3.Sankey_PathView = function () {
   };
 
   biHiSankey.visibleNodes = function () {
-    debugger;
     return nodes.filter(function (node) { return node.visible });
   };
 

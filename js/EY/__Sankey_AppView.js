@@ -5,34 +5,13 @@ d3.Sankey_AppView = function () {
   "use strict";
 
   var biHiSankey = {},
-    nodeWidth = 24,
-    nodeHeight = 40,
-    informationSystemNodeWidth = 80,
-    informationSystemNodeHeigth = 40,
-    nodeSpacing = 8,
-    linkSpacing = 5,
-    arrowheadScaleFactor = 0, // Specifies the proportion of a link's stroke width to be allowed for the marker at the end of the link.
-    size = [1, 1], // default to one pixel by one pixel
     nodes = [],
     nodeMap = {},
     parentNodes = [],
     leafNodes = [],
     links = [],
-    xScaleFactor = 1,
-    yScaleFactor = 1,
-    defaultLinkCurvature = 1,
-    WIDTH = 1100,
-    VERTICAL_OFFSET = 380,
-    HORIZONTAL_OFFSET = 0,
-    VERTICAL_ISNODE_INCREMENT = 20,
-    VERTICAL_ISNODE_INCREMENT_FACTOR = 40,
-    VERTICAL_NODE_INCREMENT_FACTOR = 2,
     informationSystems,
     legendData;
-
-  function center(node) {
-    return node.y + node.height / 2;
-  }
 
   function value(link) {
     return link.value;
@@ -68,13 +47,6 @@ d3.Sankey_AppView = function () {
     });
   }
 
-  function addAncestorsToChildren(node) {
-    node.children.forEach(function (child) {
-      child.ancestors = child.ancestors.concat(this.ancestors.concat([this]));
-      addAncestorsToChildren(child);
-    }, node);
-  }
-
   // generate hierarchical connections between parent and child nodes
   function computeNodeHierarchy() {
     var parent,
@@ -90,7 +62,6 @@ d3.Sankey_AppView = function () {
 
     computeLeafNodes();
     computeParentNodes();
-
   }
 
   // Populate the sourceLinks and targetLinks for each node.
@@ -203,12 +174,6 @@ d3.Sankey_AppView = function () {
         };
       });
     });
-  }
-
-  function nodeHeight(sideLinks) {
-    var spacing = Math.max(sideLinks.length - 1, 0) * linkSpacing,
-        scaledValueSum = d3.sum(sideLinks, value) * yScaleFactor;
-    return scaledValueSum + spacing;
   }
 
   // Compute the value of each node by summing the associated links.
@@ -353,7 +318,6 @@ d3.Sankey_AppView = function () {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   }
 
-
   function computeLeftAndRightLinks() {
     var source, target;
     nodes.forEach(function (node) {
@@ -419,12 +383,15 @@ d3.Sankey_AppView = function () {
     }
 
     function initializeNodeYPosition() {
-      nodes.filter(function (d){ if (d.type === "informationsystem" ) { return true;} }).forEach(function (node, i){ node.y = VERTICAL_ISNODE_INCREMENT + VERTICAL_ISNODE_INCREMENT_FACTOR*i;});
+      nodes.filter(function (d){ if (d.type === "informationsystem" ) { return true;} }).forEach(function (node, i){
+        node.y = VERTICAL_ISNODE_INCREMENT + VERTICAL_ISNODE_INCREMENT_FACTOR*i;
+        if(node.isoutputnode) { node.y += NODE_INFORMATIONSYSTEM_HEIGHT/2 };
+      });
       var nbVariablesIS;
       for (var i = 0; i < informationSystems.length; i++){
         var concernedVariables = nodes.filter(function (d){ if (  d.type === "variable"   ) { return true;} }).filter(function (d){ if (  d.informationsystem === informationSystems[i] ) { return true;} });
         nbVariablesIS = concernedVariables.length;
-        concernedVariables.forEach(function (node, index){ node.y = VERTICAL_OFFSET + nbVariablesIS*nodeWidth*(index/VERTICAL_NODE_INCREMENT_FACTOR);});
+        concernedVariables.forEach(function (node, index){ node.y = VERTICAL_OFFSET_APPVIEW + nbVariablesIS*nodeWidth*(index/VERTICAL_NODE_INCREMENT_FACTOR);});
       }
     }
 
@@ -554,11 +521,17 @@ d3.Sankey_AppView = function () {
       // Remark rightY and leftY can be used for x also.
 
       node.rightLinks.forEach(function (link) {
-        if (link.direction > 0) {link.sourceY = rightY;} else {link.targetY = rightY;}
+        if (link.direction > 0) {link.sourceY = rightY;} else {
+          link.targetY = rightY;
+          if(link.target.isoutputnode) { link.targetY -= NODE_INFORMATIONSYSTEM_HEIGHT/2 };
+        }
       });
 
       node.leftLinks.forEach(function (link) {
-        if (link.direction < 0) {link.sourceY = leftY;} else {link.targetY = leftY;}
+        if (link.direction < 0) {link.sourceY = leftY;} else {
+          link.targetY = leftY;
+          if(link.target.isoutputnode) { link.targetY -= NODE_INFORMATIONSYSTEM_HEIGHT/2 };
+        }
       });
 
     });
@@ -623,7 +596,7 @@ d3.Sankey_AppView = function () {
           // y0 = link.source.y + link.sourceY + link.thickness / 2,
           y0 = link.source.y + link.source.height / 2,
           // y1 = link.target.y + link.targetY + link.thickness / 2;
-          y1 = link.target.y + link.target.height / 2;
+          y1 = link.target.y + link.target.height / 2 - (link.target.isoutputnode ? NODE_INFORMATIONSYSTEM_HEIGHT/2 : 0);
 
       return "M" + x0 + "," + y0
            + "L" + x1 + "," + y0
@@ -698,20 +671,6 @@ d3.Sankey_AppView = function () {
            + "L" + x5  + "," + y2;
     }
 
-/*    function link(d) {
-      if (d.source.x < d.target.x) {
-        return leftToRightLink(d);
-      }
-      return rightToLeftLink(d);
-    }*/
-
-    // function link(d){
-    //   //if (d.source.y < d.target.y){
-    //   //  return headToBottom(d);
-    //   //}
-    //   return bottomToTop(d);
-    // }
-
     function link(d){
       // debugger;
       if ( d.view == "app"){
@@ -730,7 +689,6 @@ d3.Sankey_AppView = function () {
             return rightToLeftLink(d);
         }
       }
-
     }
 
     link.curvature = function (_) {

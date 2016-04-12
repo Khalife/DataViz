@@ -7,54 +7,6 @@ var NodesCharacteristicsForAppView, NodesCharacteristicsForPathView;
 
 var tabsDOMElement = [].slice.call( document.querySelectorAll( '.tabs > nav > ul > li' ) );
 
-var OPACITY = {
-    NODE_DEFAULT: 0.9,
-    NODE_FADED: 0.1,
-    NODE_HIGHLIGHT: 0.8,
-    LINK_DEFAULT: 0.6,
-    LINK_FADED: 0.05,
-    LINK_HIGHLIGHT: 0.9
-  },
-
-  NODES_TYPES = [/* fed in function createColorSets with information systems names coming from transform */],
-  NODES_COLORS = ["#1C86EE", "#6C7B8B", "#CAAECE", "#A751D2", "#571E74", "#E2006A", "#e5c494"],
-  OUTLINES_TYPES = ["Saisie / Collecte", "Agregation", "Restitution"], 
-  OUTLINES_COLORS = ["#00688B", "#838B83", "#FF1493"], 
-  LINKS_TYPES = ["Contrôle OK", "Contrôle KO", "Pas de contrôle", "Pas d'information", "Transformée à cette étape", "Non-transformée à cette étape"],
-  LINKS_COLORS = ["green", "red", "pink", "grey", "orange", "purple"],
-
-  LINK_DEFAULT_COLOR = "grey",
-
-  NODE_WIDTH = 12,
-  NODE_HEIGHT = 27,
-  NODE_INFORMATIONSYSTEM_WIDTH = 80,
-  NODE_INFORMATIONSYSTEM_HEIGHT = 40,
-  NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH = "3px",
-
-  NODE_SPACING = 10,
-  LINK_SPACING = 4,
-
-  LINK_CURVATURE = 0.45,
-
-  COLLAPSER = {
-    RADIUS: NODE_WIDTH / 2,
-    SPACING: 2
-  },
-  OUTER_MARGIN = 10,
-  MARGIN = {
-    TOP: 2 * (COLLAPSER.RADIUS + OUTER_MARGIN),
-    RIGHT: OUTER_MARGIN,
-    BOTTOM: OUTER_MARGIN,
-    LEFT: OUTER_MARGIN
-  },
-  TRANSITION_DURATION = 400,
-  HEIGHT = 500 - MARGIN.TOP - MARGIN.BOTTOM,
-  // WIDTH = 960 - MARGIN.LEFT - MARGIN.RIGHT,
-  WIDTH = 1100 - MARGIN.LEFT - MARGIN.RIGHT,
-  LAYOUT_INTERATIONS = 32,
-  REFRESH_INTERVAL = 7000;
-
-
 var formatNumber = function (d) {
   var numberFormat = d3.format(",.0f"); // zero decimal places
   return "£" + numberFormat(d);
@@ -79,13 +31,16 @@ hideAppTooltip = function () {
     .style("opacity", 0);
 },
 
-showAppTooltip = function () {
+showAppTooltip = function (g, textToDisplay) {
   return tooltipAppView
-    .style("left", d3.event.pageX + "px")
-    .style("top", d3.event.pageY + 15 + "px")
-    .transition()
-      .duration(TRANSITION_DURATION)
-      .style("opacity", 1);
+  .style("left", g.x + MARGIN.LEFT + "px")
+  .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
+  .transition()
+    .duration(TRANSITION_DURATION)
+    .style("opacity", 1).select(".value")
+    .text(function () {
+    return textToDisplay;
+    });
 },
 
 hideAppLinkTooltip = function () {
@@ -94,13 +49,14 @@ hideAppLinkTooltip = function () {
     .style("opacity", 0);
 },
 
-showAppLinkTooltip = function (s, t) {
+showAppLinkTooltip = function (s, t, textToDisplay) {
   return tooltipAppView
+    .text(textToDisplay)
     .style("left", 0.5*(s.x + t.x) + "px")
     .style("top", 0.5*(s.y + t.y) + 15 + "px")
     .transition()
       .duration(TRANSITION_DURATION)
-      .style("opacity", 1);
+      .style("opacity", 1)
 },
 
 hidePathTooltip = function () {
@@ -186,6 +142,41 @@ getListOfIdsOfAncestors = function (node, initialList){
 };
 
 // Define color sets
+function computePolygonCoordonates(radius){
+  // Function to be called inside function to draw polygon (svg)
+  // Returns hexagone local coordinates starting from top left corner, in string form to be used with SVG
+  var corners = [], cornersString = "";
+
+  corners.push([ - radius / 2, - radius]);
+  corners.push([ radius / 2, - radius]);
+  corners.push([ radius, 0 ]);
+  corners.push([ radius / 2, radius]);
+  corners.push([ - radius / 2,  radius]);
+  corners.push([ - radius, 0]);
+  
+  for (var i = 0; i != 5; i++){
+    cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
+  }
+  cornersString = cornersString + corners[5][0].toString() + "," + corners[5][1].toString();
+  return cornersString;
+}
+
+function computeLinkPolygonCoordonates(height, width){
+  // Function used to compute polygon coordonates
+  // Returns link local coordinates starting from top left corner, in string form to be used with SVG
+  var corners = [], cornersString = "";
+  corners.push([ 0, - height/2]);
+  corners.push([ 0.85*width, -height/2]);
+  corners.push([ width, 0]);
+  corners.push([ 0.85*width, height/2]);
+  corners.push([ 0,  height/2]);
+  
+  for (var i = 0; i != 4; i++){
+    cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
+  }
+  cornersString = cornersString + corners[4][0].toString() + "," + corners[4][1].toString();
+  return cornersString;
+}
 
 function createColorSets(informationSystems) {
   NODES_TYPES = informationSystems;
@@ -193,8 +184,6 @@ function createColorSets(informationSystems) {
   colorScale_OUTLINES = d3.scale.ordinal().domain(OUTLINES_TYPES).range(OUTLINES_COLORS);
   colorScale_LINKS = d3.scale.ordinal().domain(LINKS_TYPES).range(LINKS_COLORS);
 }
-
-
 
 // End color sets
 
@@ -233,32 +222,6 @@ defs.append("marker")
 defs.append("marker")
   .style("fill", LINK_DEFAULT_COLOR)
   .attr("id", "arrowHorizontalHead")
-  .attr("viewBox", "0 0 6 10")
-  .attr("refX", "1")
-  .attr("refY", "5")
-  .attr("markerUnits", "strokeWidth")
-  .attr("markerWidth", "1")
-  .attr("markerHeight", "1")
-  .attr("orient", "auto")
-  .append("path")
-    .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
-
-defs.append("marker")
-  .style("fill", LINK_DEFAULT_COLOR)
-  .attr("id", "arrowHeadInflow")
-  .attr("viewBox", "0 0 6 10")
-  .attr("refX", "1")
-  .attr("refY", "5")
-  .attr("markerUnits", "strokeWidth")
-  .attr("markerWidth", "1")
-  .attr("markerHeight", "1")
-  .attr("orient", "auto")
-  .append("path")
-    .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
-
-defs.append("marker")
-  .style("fill", LINK_DEFAULT_COLOR)
-  .attr("id", "arrowHeadOutflow")
   .attr("viewBox", "0 0 6 10")
   .attr("refX", "1")
   .attr("refY", "5")
@@ -314,37 +277,10 @@ defs.append("marker")
   .append("path")
     .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
 
-defs.append("marker")
-  .style("fill", LINK_DEFAULT_COLOR)
-  .attr("id", "arrowHeadInflow")
-  .attr("viewBox", "0 0 6 10")
-  .attr("refX", "1")
-  .attr("refY", "5")
-  .attr("markerUnits", "strokeWidth")
-  .attr("markerWidth", "1")
-  .attr("markerHeight", "1")
-  .attr("orient", "auto")
-  .append("path")
-    .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
-
-defs.append("marker")
-  .style("fill", LINK_DEFAULT_COLOR)
-  .attr("id", "arrowHeadOutflow")
-  .attr("viewBox", "0 0 6 10")
-  .attr("refX", "1")
-  .attr("refY", "5")
-  .attr("markerUnits", "strokeWidth")
-  .attr("markerWidth", "1")
-  .attr("markerHeight", "1")
-  .attr("orient", "auto")
-  .append("path")
-    .attr("d", "M 0 0 L 1 0 L 6 5 L 1 10 L 0 10 z");
-
 d3.select("#chart-path").append("a").on("click", resetPathViewVisibility).text("|reset|");
 
 function updateAppView () {
-  
-  var link, linkEnter, node, nodeEnter, collapser, collapserEnter, legend;
+  var link, linkEnter, node, nodeEnter, collapser, collapserEnter, legend, textToDisplay, additionalInstructions, reverseControlNature, reverseControlQuality;
   
   function dragmove(node) {
     node.x = Math.max(0, Math.min(WIDTH - node.width, d3.event.x));
@@ -391,42 +327,6 @@ function updateAppView () {
   function collapse(node) {
     node.state = "collapsed";
     containChildren(node);
-  }
-
-  function computePolygonCoordonates(radius){
-    // Function to be called inside function to draw polygon (svg)
-    // Returns hexagone local coordinates starting from top left corner, in string form to be used with SVG
-    var corners = [], cornersString = "";
-
-    corners.push([ - radius / 2, - radius]);
-    corners.push([ radius / 2, - radius]);
-    corners.push([ radius, 0 ]);
-    corners.push([ radius / 2, radius]);
-    corners.push([ - radius / 2,  radius]);
-    corners.push([ - radius, 0]);
-    
-    for (var i = 0; i != 5; i++){
-      cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
-    }
-    cornersString = cornersString + corners[5][0].toString() + "," + corners[5][1].toString();
-    return cornersString;
-  }
-
-  function computeLinkPolygonCoordonates(height, width){
-    // Function used to compute polygon coordonates
-    // Returns link local coordinates starting from top left corner, in string form to be used with SVG
-    var corners = [], cornersString = "";
-    corners.push([ 0, - height/2]);
-    corners.push([ 0.85*width, -height/2]);
-    corners.push([ width, 0]);
-    corners.push([ 0.85*width, height/2]);
-    corners.push([ 0,  height/2]);
-    
-    for (var i = 0; i != 4; i++){
-      cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
-    }
-    cornersString = cornersString + corners[4][0].toString() + "," + corners[4][1].toString();
-    return cornersString;
   }
 
   function eliminateStepStringError(etapeString){
@@ -595,10 +495,24 @@ function updateAppView () {
 
   var nodeInformationSystem = node.filter(function (d){ if (d.type === "informationsystem"){return true;}});
 
-  nodeInformationSystem
+  nodeInformationSystem.filter(function(d) {return !(d.isoutputnode)})
     .append("rect")
     .attr("width", NODE_INFORMATIONSYSTEM_WIDTH)
     .attr("height", NODE_INFORMATIONSYSTEM_HEIGHT)
+    .style("fill", function (d) {
+      d.color = colorScale_NODES(d.name);
+      return d.color;
+    })
+    .style("fill-opacity", OPACITY.NODE_DEFAULT)
+    .style("stroke", function (d) {
+      var etape = eliminateStepStringError(d.etape);
+      return d3.rgb(colorScale_OUTLINES(etape)); 
+    })
+    .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
+
+  nodeInformationSystem.filter(function(d) {return d.isoutputnode})
+    .append("circle")
+    .attr("r", NODE_INFORMATIONSYSTEM_HEIGHT / 2)
     .style("fill", function (d) {
       d.color = colorScale_NODES(d.name);
       return d.color;
@@ -661,14 +575,10 @@ function updateAppView () {
   // Create and attach tooltips
 
   var linkBetweenApps = link.filter(function (l){return l.linktype == "informationsystem";});
-
   linkBetweenApps.on('mouseenter', function (d) {
     if (!isTransitioning) {
-      showAppLinkTooltip(d.source, d.target).select(".value")
-        .text(function () {
-         // showAppTooltip().select("value").text(function() {
-          return "Flux: \n" + d.source.name + " → " + d.target.name + "\n \n " + "Table : \n " + d.table + "\n \n " + "Champs du flux : \n " + d.champs + "\n \n" + "Variables transformées :\n"+ d.transformedvariables;
-        });
+      textToDisplay = "Flux: \n" + d.source.name + " → " + d.target.name + "\n \n " + "Table : \n " + d.table + "\n \n " + "Champs du flux : \n " + d.champs + "\n \n" + "Variables transformées :\n"+ d.transformedvariables;
+      showAppLinkTooltip(d.source, d.target, textToDisplay);
     }
   });
 
@@ -680,51 +590,28 @@ function updateAppView () {
 
   nodeVariableElementary.on("mouseenter", function (g) {
     if (!isTransitioning) {
-      tooltipAppView
-        .style("left", g.x + MARGIN.LEFT + "px")
-        .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
-        .transition()
-          .duration(TRANSITION_DURATION)
-          .style("opacity", 1).select(".value")
-          .text(function () {
-            var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            var reverseControlQuality = g.controlqualitytext;
-            var reverseControlNature = g.controlnaturetext; 
-            return "Table : \n" + g.table + "\n \n" + "Champs : \n" + g.champs + "\n \n" + "Contrôle effectué : \n" + reverseControlQuality + "\n \n" +"Nature du contrôle : \n" + reverseControlNature; 
-          });
+      additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
+      reverseControlQuality = g.controlqualitytext;
+      reverseControlNature = g.controlnaturetext; 
+      textToDisplay = "Table : \n" + g.table + "\n \n" + "Champs : \n" + g.champs + "\n \n" + "Contrôle effectué : \n" + reverseControlQuality + "\n \n" + "Nature du contrôle : \n" + reverseControlNature; 
+      showAppTooltip(g, textToDisplay);
     }
   });
 
   nodeVariableCalculated.on("mouseenter", function (g) {
     if (!isTransitioning) {
-      tooltipAppView
-        .style("left", g.x + MARGIN.LEFT + "px")
-        .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
-        .transition()
-          .duration(TRANSITION_DURATION)
-          .style("opacity", 1).select(".value")
-          .text(function () {
-            var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            var reverseControlQuality = g.controlqualitytext;
-            var reverseControlNature = g.controlnaturetext; 
-            return "Table : \n" + g.table + "\n \n" + "Champs : \n" + g.champs + "\n \n" + "Contrôle effectué : \n" + reverseControlQuality + "\n \n" + "Nature du contrôle : \n" + reverseControlNature; 
-          });
+      additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
+      reverseControlQuality = g.controlqualitytext;
+      reverseControlNature = g.controlnaturetext; 
+      textToDisplay = "Table : \n" + g.table + "\n \n" + "Champs : \n" + g.champs + "\n \n" + "Contrôle effectué : \n" + reverseControlQuality + "\n \n" + "Nature du contrôle : \n" + reverseControlNature;
+      showAppTooltip(g, textToDisplay);
     }
   });
 
   nodeInformationSystem.on("mouseenter", function (g){
     if (!isTransitioning){
-      restoreLinksAndNodes();
-      tooltipAppView
-        .style("left", g.x + MARGIN.LEFT + "px")
-        .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
-        .transition()
-          .duration(TRANSITION_DURATION)
-          .style("opacity", 1).select(".value")
-          .text(function () {
-            var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
-            return "Equipe :\n" + g.equipe + "\n \n" + "Responsable : \n" + g.responsable ;
-          });
+      textToDisplay = "Equipe :\n" + g.equipe + "\n \n" + "Responsable : \n" + g.responsable ;
+      showAppTooltip(g, textToDisplay);
     }
   });
 
@@ -1213,7 +1100,6 @@ function updateAppView () {
     legendQualityNALink.on("mouseleave", function (l){restoreLink("Pas d'information");});
 
   }
-
 }
 
 function launchDataVizModuleForAppView() {
@@ -1241,7 +1127,7 @@ function launchDataVizModuleForAppView() {
     .nodes(nodes)
     .links(links)
     .initializeNodes(function (node) {
-      node.visible = true;
+      node.visible = !(node.isoutputnode && node.type == "variable" );
       node.status = "open";
     }) // initializeNodes calling 6 functions, generating temporary variables used for display 
     .layout(); // layout calls 6 functions, including one which computing default x and y positions.
@@ -1314,50 +1200,10 @@ function updatePathView(){
     containChildren(node);
   }
 
-  function computePolygonCoordonates(radius){
-    // Function to be called inside function to draw polygon (svg)
-    // Returns hexagone local coordinates starting from top left corner, in string form to be used with SVG
-    var corners = [], cornersString = "";
-
-    corners.push([ - radius / 2, - radius]);
-    corners.push([ radius / 2, - radius]);
-    corners.push([ radius, 0 ]);
-    corners.push([ radius / 2, radius]);
-    corners.push([ - radius / 2,  radius]);
-    corners.push([ - radius, 0]);
-    
-    for (var i = 0; i != 5; i++){
-      cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
-    }
-    cornersString = cornersString + corners[5][0].toString() + "," + corners[5][1].toString();
-    return cornersString;
-  }
-
-  function computeLinkPolygonCoordonates(height, width){
-    // Function used to compute polygon coordonates
-    // Returns link local coordinates starting from top left corner, in string form to be used with SVG
-    var corners = [], cornersString = "";
-    corners.push([ 0, - height/2]);
-    corners.push([ 0.85*width, -height/2]);
-    corners.push([ width, 0]);
-    corners.push([ 0.85*width, height/2]);
-    corners.push([ 0,  height/2]);
-    
-    for (var i = 0; i != 4; i++){
-      cornersString =  cornersString + corners[i][0].toString() + "," + corners[i][1].toString() + ", "
-    }
-    cornersString = cornersString + corners[4][0].toString() + "," + corners[4][1].toString();
-    return cornersString;
-  }
-
   function showHidePathChildren(node) {
     disableUserInterractions(2 * TRANSITION_DURATION);
     hidePathTooltip();
     if (node.status === "open") { close(node) } else { open(node) };
-    
-    // if (node.state === "collapsed") { expand(node); }
-    // else { collapse(node); }
-
     biHiSankeyPathView.relayout();
     updatePathView();
     link.attr("d", pathPathView);
@@ -1547,24 +1393,38 @@ function updatePathView(){
       getListOfIdsOfChildren(g, listOfChildrenIds);
       var listOfIds =  listOfAncestorsIds.concat(listOfChildrenIds, [g.id]);
       var polygonOrRectangle;
-      node.filter(function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == true );}).select("circle").style("opacity", 0.1);
+      node.filter(function (d){ return ( listOfIds.indexOf(d.id) < 0 ) ;}).select("text")        
+      .transition()
+        .duration(TRANSITION_DURATION)
+        .style("opacity", OPACITY.NODE_FADED);
+      node.filter(function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == true );}).select("circle")        
+      .transition()
+        .duration(TRANSITION_DURATION)
+        .style("opacity", OPACITY.NODE_FADED);
       // node.filter(function (d){ return ( listOfIds.indexOf(d.id) > -1 ) && ( d.iscalculated == true );}).select("circle")
       //   .attr("fill", "black")
       //   .style("stroke", "yellow")
       //   .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH);
-      node.filter( function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == false ); }).select("polygon").style("opacity",0.1);
+      node.filter( function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == false ); }).select("polygon")        
+      .transition()
+        .duration(TRANSITION_DURATION)
+        .style("opacity", OPACITY.NODE_FADED);
       // node.filter(function (d){ return ( listOfIds.indexOf(d.id) > -1 ) && ( d.iscalculated == false );}).select("polygon")
       //   .attr("fill", "black")
       //   .style("stroke", "yellow")
       //   .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
-      link.filter( function (l){  return ( listOfIds.indexOf(l.source.id) < 0 ) || ( listOfIds.indexOf(l.target.id) < 0 ) }).style("opacity", 0.1);
+      link.filter( function (l){  return ( listOfIds.indexOf(l.source.id) < 0 ) || ( listOfIds.indexOf(l.target.id) < 0 ) })        
+      .transition()
+        .duration(TRANSITION_DURATION)
+        .style("opacity", OPACITY.NODE_FADED);
       // link.filter( function (l){  return ( listOfIds.indexOf(l.source.id) > -1 ) && ( listOfIds.indexOf(l.target.id) > -1 ) }).style("stroke", "yellow");
       //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       tooltipPathView
-        .style("left", g.x + MARGIN.LEFT + "px")
+        .style("left", g.x + TOOLTIP_LEFT_SHIFT + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
           .duration(TRANSITION_DURATION)
+          .delay(TRANSITION_DELAY)
           .style("opacity", 1).select(".value")
           .text(function () {
             var additionalInstructions = g.children.length ? "\n(Double click to expand)" : "";
@@ -1582,27 +1442,44 @@ function updatePathView(){
       var listOfAncestorsIds = [], listOfChildrenIds = [];
       getListOfIdsOfAncestors(g, listOfAncestorsIds);
       getListOfIdsOfChildren(g, listOfChildrenIds);
-      var listOfIds =  listOfAncestorsIds.concat(listOfChildrenIds, [g.id]);
+      // If we want all the path :
+      // var listOfIds =  listOfAncestorsIds.concat(listOfChildrenIds, [g.id]);
+      // If we want just ancestors :
+      var listOfIds = listOfAncestorsIds.concat([g.id]);
       var polygonOrRectangle;
-      node.filter(function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == true );}).select("circle").style("opacity", 0.1)
+      node.filter(function (d){ return ( listOfIds.indexOf(d.id) < 0 ) ;}).select("text")        
+      .transition()
+        .duration(TRANSITION_DURATION)
+        .style("opacity", OPACITY.NODE_FADED);
+      node.filter(function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == true );}).select("circle")
+        .transition()
+          .duration(TRANSITION_DURATION)
+          .style("opacity", OPACITY.NODE_FADED);
       // node.filter(function (d){ return ( listOfIds.indexOf(d.id) > -1 ) && ( d.iscalculated == true );}).select("circle")
       //   .attr("fill", "black")
       //   .style("stroke", "yellow")
       //   .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
       //    .style("stroke-width", "2px");
-      node.filter( function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == false ); }).select("polygon").style("opacity",0.1)
+      node.filter( function (d){ return ( listOfIds.indexOf(d.id) < 0 ) && ( d.iscalculated == false ); }).select("polygon")        
+      .transition()
+          .duration(TRANSITION_DURATION)
+          .style("opacity", OPACITY.NODE_FADED);
       // node.filter(function (d){ return ( listOfIds.indexOf(d.id) > -1 ) && ( d.iscalculated == false );}).select("polygon")
       //   .attr("fill", "black")
       //   .style("stroke", "yellow")
       //   .style("stroke-width", NODE_INFORMATIONSYSTEM_OUTLINE_WIDTH)
-      link.filter( function (l){  return ( listOfIds.indexOf(l.source.id) < 0 ) || ( listOfIds.indexOf(l.target.id) < 0 ) }).style("opacity", 0.1);
+      link.filter( function (l){  return ( listOfIds.indexOf(l.source.id) < 0 ) || ( listOfIds.indexOf(l.target.id) < 0 ) })
+      .transition()
+          .duration(TRANSITION_DURATION)
+          .style("opacity", OPACITY.NODE_FADED);
       // link.filter( function (l){  return ( listOfIds.indexOf(l.source.id) > -1 ) && ( listOfIds.indexOf(l.target.id) > -1 ) }).style("stroke", "yellow");
       //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       tooltipPathView
-        .style("left", g.x + MARGIN.LEFT + "px")
+        .style("left", g.x + TOOLTIP_LEFT_SHIFT + MARGIN.LEFT + "px")
         .style("top", g.y + g.height + MARGIN.TOP + 15 + "px")
         .transition()
           .duration(TRANSITION_DURATION)
+          .delay(TRANSITION_DELAY)
           .style("opacity", 1).select(".value")
           .text(function () {
             return "Equipe : \n" + g.equipe + "\n \n" + "Etape : \n" + g.etape+ "\n";
@@ -1614,25 +1491,16 @@ function updatePathView(){
     if (!isTransitioning) {
       //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       ///////////////////////////////////////////////   Rétablir les variables hors du chemin //////////////////////////////////////////////////////
-      node.filter(function (d){ return ( d.iscalculated );}).select("circle")
-        .style("fill", function (d) { d.color = colorScale_NODES(d.informationsystem); return d.color;})
+      node.select("text")
         .style("opacity", OPACITY.NODE_DEFAULT)
-        .style("stroke-width", "0px");
 
-      node.filter(function (d){ return ( ! d.iscalculated );}).select("polygon")       
-        .style("fill", function (d) { d.color = colorScale_NODES(d.informationsystem); return d.color; })
+      node.filter(function (d){ return ( d.iscalculated );}).select("circle")
         .style("opacity", OPACITY.NODE_DEFAULT)
-        .style("stroke-width", "0px");
+
+      node.filter(function (d){ return ( ! d.iscalculated );}).select("polygon")
+        .style("opacity", OPACITY.NODE_DEFAULT)
 
       link.style("stroke", function (d){ var color; color = d3.rgb(LINKS_COLORS[d.controlquality-1]); return color; })
-        .style("opacity", 0)
-        .transition()
-        .delay(TRANSITION_DURATION)
-        .duration(TRANSITION_DURATION)
-        .attr("d", pathPathView)
-        .style("stroke-width", function (d) { return Math.max(1, d.thickness); })
-        .style("stroke-dasharray", function (d){ return (d.dash || "");})
-        .style("stroke", function (d){ var color; color = d3.rgb(LINKS_COLORS[d.controlquality-1]); return color; })
         .style("opacity", OPACITY.LINK_DEFAULT);
       //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       hidePathTooltip();
@@ -1641,23 +1509,8 @@ function updatePathView(){
   });
 
   link.on("mouseenter", function (g){
-    // if (!isTransitioning) {
-    //   showPathLinkTooltip(g.source, g.target).select("value").text(function () {
-    //         return "Flux : \n" + g.source.informationsystem  + "->" + g.target.informationsystem + "\n \n" + "Donnée dans le flux : \n" + g.source.name;
-    //       });      
-    // }
     if (!isTransitioning) {
-      // highlightConnected(g);
-      // restoreLinksAndNodes();
-      tooltipPathView
-        .style("left", 0.5*(g.source.x + g.target.x) + MARGIN.LEFT + "px")
-        .style("top", 0.5*(g.source.y + g.target.y) + g.height + MARGIN.TOP + 15 + "px")
-        .transition()
-          .duration(TRANSITION_DURATION)
-          .style("opacity", 1).select(".value")
-          .text(function () {
-            return "Flux : \n" + g.source.informationsystem  + "->" + g.target.informationsystem + "\n \n" + "Donnée dans le flux : \n" + g.source.name;
-          });
+      showPathLinkTooltip(g.source, g.target);
     }
   });
 
@@ -1698,14 +1551,113 @@ function updatePathView(){
         legendQualityNOLink = legend.filter(function (l){ return l.text == "Pas de contrôle"}),
         legendQualityNALink = legend.filter(function (l){ return l.text == "Pas d'information"});
 
-      // 1 - Elementary / Calculated variables
-    legendElementaryVariables.append("polygon")
-      .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } )
-      .style("stroke", "black")  // colour the line
-      .style("stroke-width", "1px")
-      .style("fill", "#FFFFFF");
+    // IS specific : to be modified
+    var legendLiq = legend.filter(function (l) { return ( l.text == "Liq" );}),
+        legendPicasso = legend.filter(function (l) { return ( l.text == "Picasso" );}),
+        legendMatisseEPM = legend.filter(function (l) { return ( l.text == "Matisse EPM" );}),
+        legendFermatEris = legend.filter(function (l) { return ( l.text == "Fermat / E-ris" );}),
+        legendFermat = legend.filter(function (l) { return ( l.text == "Fermat" );}),
+        legendAmadea = legend.filter(function (l) { return ( l.text == "Amadea" );}),
+        legendExposure = legend.filter(function (l) { return ( l.text == "Exposure" );});
 
-    legendElementaryVariables.append("text")
+    legendLiq.append("rect")
+      .attr("fill", NODES_COLORS[0])
+      .attr("x", function(d) {return 0;})
+      .attr("y", function(d) {return -NODE_WIDTH/2;})
+      .attr("width", NODE_HEIGHT)
+      .attr("height", NODE_WIDTH);
+
+    legendLiq.append("text")
+      .attr("x", function (d) {return "35px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendPicasso.append("rect")
+      .attr("fill", NODES_COLORS[1])
+      .attr("x", function(d) {return 0;})
+      .attr("y", function(d) {return -NODE_WIDTH/2;})
+      .attr("width", NODE_HEIGHT)
+      .attr("height", NODE_WIDTH);
+
+    legendPicasso.append("text")
+      .attr("x", function (d) {return "35px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendMatisseEPM.append("rect")
+      .attr("fill", NODES_COLORS[2])
+      .attr("x", function(d) {return 0;})
+      .attr("y", function(d) {return -NODE_WIDTH/2;})
+      .attr("width", NODE_HEIGHT)
+      .attr("height", NODE_WIDTH);
+
+    legendMatisseEPM.append("text")
+      .attr("x", function (d) {return "35px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendFermatEris.append("rect")
+      .attr("fill", NODES_COLORS[3])
+      .attr("x", function(d) {return 0;})
+      .attr("y", function(d) {return -NODE_WIDTH/2;})
+      .attr("width", NODE_HEIGHT)
+      .attr("height", NODE_WIDTH);
+
+    legendFermatEris.append("text")
+      .attr("x", function (d) {return "35px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendFermat.append("rect")
+      .attr("fill", NODES_COLORS[4])
+      .attr("x", function(d) {return 0;})
+      .attr("y", function(d) {return -NODE_WIDTH/2;})
+      .attr("width", NODE_HEIGHT)
+      .attr("height", NODE_WIDTH);
+
+    legendFermat.append("text")
+      .attr("x", function (d) {return "35px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendAmadea.append("rect")
+      .attr("fill", NODES_COLORS[5])
+      .attr("x", function(d) {return 0;})
+      .attr("y", function(d) {return -NODE_WIDTH/2;})
+      .attr("width", NODE_HEIGHT)
+      .attr("height", NODE_WIDTH)
+
+    legendAmadea.append("text")
+      .attr("x", function (d) {return "35px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
+
+    legendExposure.append("rect")
+      .attr("fill", NODES_COLORS[6])
+      .attr("x", function(d) {return 0;})
+      .attr("y", function(d) {return -NODE_WIDTH/2;})
+      .attr("width", NODE_HEIGHT)
+      .attr("height", NODE_WIDTH);
+
+    legendExposure.append("text")
       .attr("x", function (d) {return "20px";})
       .attr("y", function (d) {return 0;})
       .attr("dy", ".35em")
@@ -1713,12 +1665,24 @@ function updatePathView(){
       .attr("transform", null)
       .text(function (d) { return d.text; });
 
+    // 1 - Elementary / Calculated variables
+    legendElementaryVariables.append("polygon")
+      .attr("points", function (l){  return computePolygonCoordonates(NODE_HEIGHT/4); } )
+      .style("stroke", "black")  // colour the line
+      .style("stroke-width", "1px")
+      .style("fill", "#FFFFFF");
+    legendElementaryVariables.append("text")
+      .attr("x", function (d) {return "20px";})
+      .attr("y", function (d) {return 0;})
+      .attr("dy", ".35em")
+      .attr("text-anchor", "start")
+      .attr("transform", null)
+      .text(function (d) { return d.text; });
     legendCalculatedVariables.append("circle")
       .attr("fill", " #FFFFFF")
       .attr("r", NODE_WIDTH/2)
       .style("stroke", "black")
       .style("stroke-width", "1px");
-
     legendCalculatedVariables.append("text")
       .attr("x", function (d) {return "20px";})
       .attr("y", function (d) {return 0;})
@@ -1733,7 +1697,6 @@ function updatePathView(){
       .style("stroke", LINK_DEFAULT_COLOR)
       .style("stroke-width", "2px")
       .style("fill", LINK_DEFAULT_COLOR);
-
     legendAutomaticLink.append("text")
       .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
       .attr("y", function (d) {return 0;})
@@ -1741,7 +1704,6 @@ function updatePathView(){
       .attr("text-anchor", "start")
       .attr("transform", null)
       .text(function (d) { return d.text; });
-
     legendSemiAutomaticLink.append("line")
       .attr("x1", function(d) {return 0;})
       .attr("y1", function(d) {return 0;})
@@ -1750,7 +1712,6 @@ function updatePathView(){
       .style("stroke", LINK_DEFAULT_COLOR)  // colour the line
       .style("stroke-width", "4px")
       .style("fill", LINK_DEFAULT_COLOR);
-
     legendSemiAutomaticLink.append("text")
       .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
       .attr("y", function (d) {return 0;})
@@ -1758,7 +1719,6 @@ function updatePathView(){
       .attr("text-anchor", "start")
       .attr("transform", null)
       .text(function (d) { return d.text; });
-
     legendManualLink.append("line")
       .attr("x1", function(d) {return 0;})
       .attr("y1", function(d) {return 0;})
@@ -1768,7 +1728,6 @@ function updatePathView(){
       .style("stroke-width", "4px")
       .style("stroke-dasharray", "5,5")
       .style("fill", LINK_DEFAULT_COLOR);
-
     legendManualLink.append("text")
       .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
       .attr("y", function (d) {return 0;})
@@ -1776,14 +1735,12 @@ function updatePathView(){
       .attr("text-anchor", "start")
       .attr("transform", null)
       .text(function (d) { return d.text; });
-
     legendQualityOKLink.append("polygon")
       .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
       .style("stroke", d3.rgb(LINKS_COLORS[0]))
       .style("stroke-width", "2px")
       .style("opacity", 0.6)
       .style("fill", d3.rgb(LINKS_COLORS[0]));
-
     legendQualityOKLink.append("text")
       .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
       .attr("y", function (d) {return 0;})
@@ -1791,14 +1748,12 @@ function updatePathView(){
       .attr("text-anchor", "start")
       .attr("transform", null)
       .text(function (d) { return d.text; });
-
     legendQualityKOLink.append("polygon")
       .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
       .style("stroke", d3.rgb(LINKS_COLORS[1]))
       .style("stroke-width", "2px")
       .style("opacity", 0.6)
       .style("fill", d3.rgb(LINKS_COLORS[1]));
-
     legendQualityKOLink.append("text")
       .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
       .attr("y", function (d) {return 0;})
@@ -1806,14 +1761,12 @@ function updatePathView(){
       .attr("text-anchor", "start")
       .attr("transform", null)
       .text(function (d) { return d.text; });
-
     legendQualityNOLink.append("polygon")
       .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
       .style("stroke", d3.rgb(LINKS_COLORS[2]))
       .style("stroke-width", "2px")
       .style("opacity", 0.6)
       .style("fill", d3.rgb(LINKS_COLORS[2]));
-
     legendQualityNOLink.append("text")
       .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
       .attr("y", function (d) {return 0;})
@@ -1821,14 +1774,12 @@ function updatePathView(){
       .attr("text-anchor", "start")
       .attr("transform", null)
       .text(function (d) { return d.text; });
-
     legendQualityNALink.append("polygon")
       .attr("points", function (l){ return computeLinkPolygonCoordonates(NODE_HEIGHT/3, NODE_WIDTH*2.5); } )  // x,y points 
       .style("stroke", d3.rgb(LINKS_COLORS[3]))
       .style("stroke-width", "2px")
       .style("opacity", 0.6)
       .style("fill", d3.rgb(LINKS_COLORS[3]));
-
     legendQualityNALink.append("text")
       .attr("x", function (d) {return NODE_HEIGHT/2 + 20;})
       .attr("y", function (d) {return 0;})
