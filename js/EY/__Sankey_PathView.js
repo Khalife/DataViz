@@ -220,7 +220,7 @@ d3.Sankey_PathView = function () {
     nodesByInformationSystem.forEach( function (nodes,i) { 
       nodes.forEach(function (n) {
         n.width = nodeWidth;
-        n.x = HORIZONTAL_OFFSET_PATHVIEW + i*WIDTH/(nodesByInformationSystem.length+3);
+        n.x = HORIZONTAL_OFFSET_PATHVIEW + i*WIDTH_PATHVIEW/(nodesByInformationSystem.length+3);
       })
     });
   }
@@ -346,7 +346,7 @@ d3.Sankey_PathView = function () {
     }
 
     initializeNodeYPosition();
-    minY = VERTICAL_OFFSET;
+    minY = VERTICAL_OFFSET_PATHVIEW;
     adjustTop(minY);
   }
 

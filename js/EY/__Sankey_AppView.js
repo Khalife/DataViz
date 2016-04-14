@@ -263,9 +263,9 @@ d3.Sankey_AppView = function () {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // 1 - Information system nodes
     var nbIsNodes = nodes.filter(function(d){ if (d.type  == "informationsystem") { return true; } }).length;
-    var X_IS = [], incrementalX = WIDTH / (nbIsNodes + 3);
+    var X_IS = [], incrementalX = WIDTH_APPVIEW / (nbIsNodes + 3);
     var incrementalXIndex = 1, i = 0;
-    nodes.filter(function (d){ if (d.type  == "informationsystem") { return true; } }).forEach( function (d) { X_IS.push(incrementalXIndex*incrementalX - HORIZONTAL_OFFSET); incrementalXIndex = incrementalXIndex + 1;} );
+    nodes.filter(function (d){ if (d.type  == "informationsystem") { return true; } }).forEach( function (d) { X_IS.push(incrementalXIndex*incrementalX - HORIZONTAL_OFFSET_APPVIEW); incrementalXIndex = incrementalXIndex + 1;} );
     var remainingNodes = nodes.filter(function (d){ if (d.type  == "informationsystem") { return true; } }),
         nextNodes,
         x = X_IS[0],

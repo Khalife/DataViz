@@ -223,7 +223,7 @@ function createPathNodesAndLinksFromData(data){
   NodesAndLinksForAppView = result;
   NodesAndLinksForPathView = result;
 
-  document.getElementById("container").style = "visibility: visible;"
+  // document.getElementById("container").style = "visibility: visible";
   launchDataVizModuleForAppView();
   launchDataVizModuleForPathView();
 }
